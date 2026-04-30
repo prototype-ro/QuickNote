@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>QuickNote — cold-premium note capture</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+
+  @keyframes qn-card-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes qn-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes qn-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50%      { transform: scale(1.06); opacity: 1; }
+  }
+  @keyframes qn-sheet-in {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  @keyframes qn-pulse {
+    0%, 100% { box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.6), 0 0 0 0 rgba(10,10,11,0); }
+    50%      { box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.6), 0 0 0 6px rgba(10,10,11,0.05); }
+  }
+  @keyframes qn-slide-in-right {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
+  }
+
+  input::placeholder { color: #9CA3AF; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+  <script type="text/babel" src="library.jsx"></script>
+
+  <script type="text/babel">
+    const PHONE_W = 390;
+    const PHONE_H = 844;
+
+    // Tweakable defaults — host rewrites this JSON block when user changes a value.
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "haloColor": "#7AA7FF",
+      "accentMode": "blue",
+      "filterChipsTop": 116,
+      "noteListTop": 230,
+      "chipBackdrop": true,
+      "captureCopy": "anything on your mind…",
+      "headerGreeting": "good morning, alex.",
+      "headerTitle": "mind",
+      "showLibraryPill": true,
+      "wallpaperWarmth": 0
+    }/*EDITMODE-END*/;
+
+    function Frame({ children }) {
+      // Soft device frame around each artboard contents
+      return (
+        <div style={{
+          width: PHONE_W, height: PHONE_H, position: 'relative',
+          background: '#F0F2F4',
+          overflow: 'hidden',
+        }}>{children}</div>
+      );
+    }
+
+    function App() {
+      const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+      // expose to all child screens via a global window var (simplest path; no prop drilling through DCArtboard)
+      React.useEffect(() => { window.__qnTweaks = tweaks; window.dispatchEvent(new CustomEvent('qn-tweaks-changed')); }, [tweaks]);
+
+      const accentMap = {
+        blue:   '#7AA7FF',
+        sage:   '#9BC4A8',
+        amber:  '#E8B26A',
+        rose:   '#E59AAA',
+        violet: '#A89BD8',
+        slate:  '#9AA4B2',
+      };
+
+      return (
+        <React.Fragment>
+        <DesignCanvas>
+          <DCSection id="prototype" title="Interactive prototype" subtitle="Type, send, watch the AI sort it. Right-click a card to swipe-reveal delete.">
+            <DCArtboard id="proto" label="QuickNote · live" width={PHONE_W} height={PHONE_H}>
+              <Prototype />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="screens" title="Screens" subtitle="Six static states, the way they ship.">
+            <DCArtboard id="splash"     label="01 · Splash"        width={PHONE_W} height={PHONE_H}><SplashScreen /></DCArtboard>
+            <DCArtboard id="inbox"      label="02 · Mind (Inbox)"  width={PHONE_W} height={PHONE_H}><InboxScreen /></DCArtboard>
+            <DCArtboard id="processing" label="03 · Thinking"      width={PHONE_W} height={PHONE_H}><ProcessingScreen /></DCArtboard>
+            <DCArtboard id="detail"     label="04 · Note detail"   width={PHONE_W} height={PHONE_H}><DetailScreen /></DCArtboard>
+            <DCArtboard id="lock"       label="05 · Lock screen"   width={PHONE_W} height={PHONE_H}><LockScreen /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="library" title="Library — the quieter shelf" subtitle="URLs land here, never in Mind. Image-first masonry, host pills, durations on video.">
+            <DCArtboard id="library-screen" label="Library" width={PHONE_W} height={PHONE_H}><LibraryScreen /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="empty" title="Empty states" subtitle="One soft glow, one playful line. Personality lives here.">
+            <DCArtboard id="empty-inbox"  label="Empty mind"        width={PHONE_W} height={PHONE_H}><EmptyScreen variant="inbox" /></DCArtboard>
+            <DCArtboard id="empty-filter" label="Empty filter (tasks)" width={PHONE_W} height={PHONE_H}><EmptyScreen variant="filter" /></DCArtboard>
+            <DCArtboard id="empty-first"  label="First-launch (pulsing capture)" width={PHONE_W} height={PHONE_H}><EmptyScreen variant="first" /></DCArtboard>
+          </DCSection>
+
+          <DCPostIt top={20} right={60} rotate={3} width={210}>
+            cold-premium = restraint as luxury. monochrome. frosted glass. Helvetica Neue 800 vs 300.
+          </DCPostIt>
+        </DesignCanvas>
+
+        <TweaksPanel title="Tweaks">
+          <TweakSection title="Layout" subtitle="Fix the chip-row overlap by raising the note list.">
+            <TweakSlider label="Note list top" value={tweaks.noteListTop} min={180} max={240} step={2} onChange={(v) => setTweak('noteListTop', v)} suffix="px" />
+            <TweakSlider label="Filter chips block height" value={tweaks.filterChipsTop} min={100} max={140} step={2} onChange={(v) => setTweak('filterChipsTop', v)} suffix="px" />
+            <TweakToggle label="Frosted backdrop on chip row" value={tweaks.chipBackdrop} onChange={(v) => setTweak('chipBackdrop', v)} />
+          </TweakSection>
+
+          <TweakSection title="Voice" subtitle="The few words that carry the brand.">
+            <TweakText label="Header greeting" value={tweaks.headerGreeting} onChange={(v) => setTweak('headerGreeting', v)} />
+            <TweakText label="Header title" value={tweaks.headerTitle} onChange={(v) => setTweak('headerTitle', v)} />
+            <TweakText label="Capture placeholder" value={tweaks.captureCopy} onChange={(v) => setTweak('captureCopy', v)} />
+          </TweakSection>
+
+          <TweakSection title="Accent" subtitle="The single color allowed to appear.">
+            <TweakRadio label="Halo color" value={tweaks.accentMode} options={[
+              { label: 'Blue',   value: 'blue' },
+              { label: 'Sage',   value: 'sage' },
+              { label: 'Amber',  value: 'amber' },
+              { label: 'Rose',   value: 'rose' },
+              { label: 'Violet', value: 'violet' },
+              { label: 'Slate',  value: 'slate' },
+            ]} onChange={(v) => setTweak({ accentMode: v, haloColor: accentMap[v] })} />
+            <TweakSlider label="Wallpaper warmth" value={tweaks.wallpaperWarmth} min={-15} max={15} step={1} onChange={(v) => setTweak('wallpaperWarmth', v)} suffix="°" />
+          </TweakSection>
+
+          <TweakSection title="Mind ↔ Library">
+            <TweakToggle label="Show library pill in header" value={tweaks.showLibraryPill} onChange={(v) => setTweak('showLibraryPill', v)} />
+          </TweakSection>
+        </TweaksPanel>
+        </React.Fragment>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
