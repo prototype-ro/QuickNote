@@ -6,6 +6,7 @@ import SwiftData
 struct MindView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Note.createdAt, order: .reverse) private var allNotes: [Note]
     @Query(sort: \Link.createdAt, order: .reverse) private var savedLinks: [Link]
 
@@ -96,7 +97,7 @@ struct MindView: View {
                     onArchive: { archiveNote(note) },
                     onDelete: { deleteNote(note) }
                 )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
 
             if appState.isShowingDigestDetail {
@@ -107,14 +108,14 @@ struct MindView: View {
                     appState.activeNote = note
                     withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
                 })
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
 
             if appState.isShowingSettings {
                 SettingsView(notes: allNotes) {
                     withAnimation(AppAnimation.springFluid) { appState.isShowingSettings = false }
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
 
             if appState.isRecalling {
@@ -130,7 +131,7 @@ struct MindView: View {
                         withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
                     }
                 )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(AppAnimation.springFluid, value: appState.stage)
@@ -463,7 +464,7 @@ struct MindView: View {
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.tertiaryText)
                         .padding(.leading, 2)
-                        .contentTransition(.numericText())
+                        .contentTransition(reduceMotion ? .identity : .numericText())
                 }
             }
 
@@ -502,7 +503,7 @@ struct MindView: View {
                             DigestCard(allNotes: allNotes, linkCount: displayedLinks.count) {
                                 withAnimation(AppAnimation.springFluid) { appState.isShowingDigestDetail = true }
                             }
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                         }
 
                         ForEach(Array(filteredNotes.enumerated()), id: \.element.id) { i, note in
@@ -519,7 +520,7 @@ struct MindView: View {
                                     onDelete: { deleteNote(note) }
                                 )
                                 .inkReveal(active: note.id == latestNoteID)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
+                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                                 .animation(
                                     AppAnimation.springFluid.delay(Double(i) * 0.04),
                                     value: filteredNotes.count
@@ -750,21 +751,16 @@ struct MindView: View {
 
     private func tagChip(_ label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text("#\(label)")
-                .font(.system(size: 10.5, weight: .medium))
-                .tracking(0.2)
-                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 24)
-                .background(
-                    isActive
-                        ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom], startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(AppColors.ink.opacity(0.04))
-                )
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.06), lineWidth: 0.5))
+            Pill(isActive: isActive) {
+                Text("#\(label)")
+                    .appFont(10.5, .medium, relativeTo: .caption2)
+                    .tracking(0.2)
+                    .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     // MARK: - Embedding backfill

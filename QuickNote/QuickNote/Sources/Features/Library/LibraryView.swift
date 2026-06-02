@@ -198,23 +198,17 @@ struct LibraryView: View {
         return Button {
             withAnimation(AppAnimation.springSnappy) { appState.libraryFilter = type }
         } label: {
-            Text(type.label)
-                .appFont(10.5, .medium, relativeTo: .caption2)
-                .tracking(0.3)
-                .textCase(.uppercase)
-                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(
-                    isActive
-                        ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom],
-                                                       startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(AppColors.ink.opacity(0.06))
-                )
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.04), lineWidth: 0.5))
+            Pill(isActive: isActive) {
+                Text(type.label)
+                    .appFont(10.5, .medium, relativeTo: .caption2)
+                    .tracking(0.3)
+                    .textCase(.uppercase)
+                    .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
+        .accessibilityLabel(type.label)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     // MARK: - Sort button (Fix 6)
@@ -611,6 +605,7 @@ private struct SwipeableLinkCard: View {
             }
 
             LinkCard(link: link)
+                .pressable(scale: 0.985)
                 .offset(x: dragOffset)
                 .simultaneousGesture(swipeGesture)
                 .simultaneousGesture(

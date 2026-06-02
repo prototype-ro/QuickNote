@@ -10,6 +10,8 @@ struct DevelopEditorView: View {
     @State private var draft: String = ""
     @State private var monospace: Bool = false
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var wordCount: Int {
         draft.split { $0 == " " || $0 == "\n" || $0 == "\t" }.count
@@ -41,14 +43,16 @@ struct DevelopEditorView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("save and close")
 
             Spacer()
 
             Text("\(wordCount) word\(wordCount == 1 ? "" : "s")")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .monospacedDigit()
                 .foregroundStyle(AppColors.tertiaryText)
-                .contentTransition(.numericText())
+                .contentTransition(reduceMotion ? .identity : .numericText())
+                .accessibilityLabel("\(wordCount) words")
 
             Button { monospace.toggle() } label: {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
@@ -62,6 +66,7 @@ struct DevelopEditorView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(monospace ? "switch to prose" : "switch to monospace")
         }
         .padding(.horizontal, 20)
         .frame(height: 52)

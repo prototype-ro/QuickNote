@@ -54,31 +54,42 @@ enum HapticEngine {
 struct InkReveal: ViewModifier {
     var active: Bool
     @State private var progress: CGFloat = 0
+    @State private var opacity: CGFloat = 1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        content
-            .mask(
-                GeometryReader { geo in
-                    HStack(spacing: 0) {
-                        Color.black
-                            .frame(width: geo.size.width * progress)
-                        LinearGradient(
-                            colors: [.black, .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .frame(width: min(geo.size.width * 0.10, 20))
-                        Color.clear
+        if reduceMotion {
+            // Fade in instead of pen-stroke sweep when motion is reduced.
+            content
+                .opacity(opacity)
+                .onAppear {
+                    if active { withAnimation(.easeOut(duration: 0.3)) { opacity = 1 } }
+                }
+        } else {
+            content
+                .mask(
+                    GeometryReader { geo in
+                        HStack(spacing: 0) {
+                            Color.black
+                                .frame(width: geo.size.width * progress)
+                            LinearGradient(
+                                colors: [.black, .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: min(geo.size.width * 0.10, 20))
+                            Color.clear
+                        }
+                    }
+                )
+                .onAppear {
+                    if active {
+                        withAnimation(.easeOut(duration: 0.44)) { progress = 1 }
+                    } else {
+                        progress = 1
                     }
                 }
-            )
-            .onAppear {
-                if active {
-                    withAnimation(.easeOut(duration: 0.44)) { progress = 1 }
-                } else {
-                    progress = 1
-                }
-            }
+        }
     }
 }
 

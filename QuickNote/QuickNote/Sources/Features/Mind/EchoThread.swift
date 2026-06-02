@@ -13,6 +13,7 @@ struct EchoThread: View {
     var onTap: () -> Void = {}
 
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
@@ -63,9 +64,11 @@ struct EchoThread: View {
         }
         .buttonStyle(.plain)
         .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : -4)
+        .offset(y: appeared && !reduceMotion ? 0 : -4)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) { appeared = true }
+            withAnimation(reduceMotion
+                          ? .easeOut(duration: 0.25)
+                          : .easeOut(duration: 0.5)) { appeared = true }
         }
     }
 }

@@ -10,6 +10,7 @@ struct NoteDetailSheet: View {
     var onDelete: () -> Void
 
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(filter: #Predicate<Note> { !$0.isArchived }) private var allNotes: [Note]
 
     @State private var showDeleteAlert = false
@@ -42,9 +43,8 @@ struct NoteDetailSheet: View {
 
             sheetContent
                 .offset(y: sheetDragOffset)
-                // Fix 8: no animation while finger is down; spring on release
                 .animation(isDragging ? nil : AppAnimation.springFluid, value: sheetDragOffset)
-                .transition(.move(edge: .bottom))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom))
         }
         .ignoresSafeArea()
         .fullScreenCover(isPresented: $showDevelop) {
@@ -199,11 +199,13 @@ struct NoteDetailSheet: View {
                 NoteBadge(kind: note.type)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("type: \(note.type.rawValue), tap to change")
 
             Spacer()
             Text("captured · \(relativeTime)")
                 .appFont(12, .light, relativeTo: .caption)
                 .foregroundStyle(AppColors.tertiaryText)
+                .accessibilityLabel("captured \(relativeTime)")
         }
     }
 
@@ -630,6 +632,7 @@ struct NoteDetailSheet: View {
                 .foregroundStyle(AppColors.secondaryText)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(note.isArchived ? "unarchive note" : "archive note")
 
             Spacer()
 
@@ -639,8 +642,9 @@ struct NoteDetailSheet: View {
                     .foregroundStyle(AppColors.destructive)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("delete note")
+            .accessibilityHint("cannot be undone")
         }
-        // Fix 7: 28pt minimum before archive/delete row
         .padding(.top, 28)
     }
 

@@ -217,6 +217,9 @@ struct LinkCard: View {
             }
             .padding(.horizontal, 2)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(link.title). \(link.author ?? link.host)")
+        .accessibilityHint("double tap to open")
     }
 
     private var liquidGlassBorder: some View {
