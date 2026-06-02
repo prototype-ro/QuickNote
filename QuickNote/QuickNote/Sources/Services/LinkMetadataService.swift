@@ -6,6 +6,7 @@ struct FetchedLinkMetadata {
     var title: String?
     var thumbnailURLString: String?
     var author: String?
+    var product: ProductInfo?
 }
 
 actor LinkMetadataService {
@@ -177,10 +178,12 @@ actor LinkMetadataService {
             req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             let (data, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return FetchedLinkMetadata() }
-            // Only parse the first 64 KB — OG tags are always in <head>
-            let slice = data.prefix(65536)
+            // Parse the first 200 KB — JSON-LD Product blocks can sit lower than OG tags.
+            let slice = data.prefix(200_000)
             guard let html = String(data: slice, encoding: .utf8) ?? String(data: slice, encoding: .isoLatin1) else { return FetchedLinkMetadata() }
-            return parseOG(html, baseURL: full)
+            var meta = parseOG(html, baseURL: full)
+            meta.product = Self.parseProduct(html)
+            return meta
         } catch { return FetchedLinkMetadata() }
     }
 
@@ -211,6 +214,116 @@ actor LinkMetadataService {
             thumbnailURLString: thumb ?? tag("twitter:image"),
             author: tag("og:site_name")
         )
+    }
+
+    // MARK: - Product detection (JSON-LD schema.org/Product + OG product tags)
+
+    /// Extracts product info from page HTML. Tries JSON-LD `Product` first, then
+    /// OpenGraph product meta tags. Returns nil if the page isn't a product.
+    static func parseProduct(_ html: String) -> ProductInfo? {
+        if let p = parseJSONLDProduct(html) { return p }
+        return parseOGProduct(html)
+    }
+
+    private static func parseJSONLDProduct(_ html: String) -> ProductInfo? {
+        let pattern = #"<script[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#
+        guard let rx = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else { return nil }
+        let range = NSRange(html.startIndex..., in: html)
+        for m in rx.matches(in: html, range: range) {
+            guard let r = Range(m.range(at: 1), in: html) else { continue }
+            let json = String(html[r])
+            guard let data = json.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) else { continue }
+            if let node = findProductNode(in: obj) {
+                return productInfo(from: node)
+            }
+        }
+        return nil
+    }
+
+    /// Recursively finds a node whose @type is "Product" within decoded JSON-LD
+    /// (which may be a dict, an array, or use @graph).
+    private static func findProductNode(in any: Any) -> [String: Any]? {
+        if let dict = any as? [String: Any] {
+            let type = dict["@type"]
+            if (type as? String) == "Product" || (type as? [String])?.contains("Product") == true {
+                return dict
+            }
+            if let graph = dict["@graph"], let found = findProductNode(in: graph) { return found }
+            for value in dict.values {
+                if let found = findProductNode(in: value) { return found }
+            }
+        } else if let arr = any as? [Any] {
+            for value in arr {
+                if let found = findProductNode(in: value) { return found }
+            }
+        }
+        return nil
+    }
+
+    private static func productInfo(from node: [String: Any]) -> ProductInfo? {
+        let name = (node["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let name, !name.isEmpty else { return nil }
+
+        let brand: String? = {
+            if let s = node["brand"] as? String { return s }
+            if let d = node["brand"] as? [String: Any] { return d["name"] as? String }
+            return nil
+        }()
+
+        // offers may be a dict or an array of dicts
+        let offer: [String: Any]? = {
+            if let d = node["offers"] as? [String: Any] { return d }
+            if let a = node["offers"] as? [Any] { return a.first as? [String: Any] }
+            return nil
+        }()
+        let currency = offer?["priceCurrency"] as? String
+        let priceText: String? = {
+            guard let offer else { return nil }
+            let raw: String?
+            if let s = offer["price"] as? String { raw = s }
+            else if let n = offer["price"] as? NSNumber { raw = n.stringValue }
+            else { raw = nil }
+            guard let raw, !raw.isEmpty else { return nil }
+            return [currency, raw].compactMap { $0 }.joined(separator: " ")
+        }()
+        let availability: String? = {
+            guard let a = offer?["availability"] as? String else { return nil }
+            // schema URLs look like "https://schema.org/InStock"
+            let tail = a.split(separator: "/").last.map(String.init) ?? a
+            if tail.lowercased().contains("instock") { return "in stock" }
+            if tail.lowercased().contains("outofstock") { return "out of stock" }
+            return nil
+        }()
+
+        return ProductInfo(name: name, brand: brand, priceText: priceText,
+                           currency: currency, availability: availability)
+    }
+
+    private static func parseOGProduct(_ html: String) -> ProductInfo? {
+        func meta(_ prop: String) -> String? {
+            for pattern in [
+                #"property=["']\#(prop)["'][^>]*content=["']([^"'<>]{1,300})["']"#,
+                #"content=["']([^"'<>]{1,300})["'][^>]*property=["']\#(prop)["']"#,
+                #"name=["']\#(prop)["'][^>]*content=["']([^"'<>]{1,300})["']"#
+            ] {
+                if let rx = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+                   let m = rx.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+                   let r = Range(m.range(at: 1), in: html) {
+                    return String(html[r]).htmlEntityDecoded
+                }
+            }
+            return nil
+        }
+        let type = meta("og:type")
+        let amount = meta("product:price:amount") ?? meta("og:price:amount")
+        // Only treat as product if it declares product type or exposes a price.
+        guard type?.lowercased().contains("product") == true || amount != nil else { return nil }
+        guard let name = meta("og:title"), !name.isEmpty else { return nil }
+        let currency = meta("product:price:currency") ?? meta("og:price:currency")
+        let priceText = amount.map { [currency, $0].compactMap { $0 }.joined(separator: " ") }
+        return ProductInfo(name: name, brand: meta("og:brand") ?? meta("product:brand"),
+                           priceText: priceText, currency: currency, availability: nil)
     }
 
     // MARK: - YouTube video ID
