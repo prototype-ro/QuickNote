@@ -82,29 +82,39 @@ struct MockThumb: View {
 struct PlatformPill: View {
     let kind: LinkKind
 
-    private var config: (label: String, bg: Color)? {
+    private var label: String? {
         switch kind {
-        case .youtube:        return ("YouTube",   Color(hex: "FF3D3D").opacity(0.92))
-        case .tiktok:         return ("TikTok",    AppColors.ink.opacity(0.85))
-        case .instagram:      return ("Instagram", Color(hex: "E1306C").opacity(0.90))
-        case .spotify:        return ("Spotify",   Color(hex: "1DB954").opacity(0.90))
+        case .youtube:   return "YouTube"
+        case .tiktok:    return "TikTok"
+        case .instagram: return "Instagram"
+        case .spotify:   return "Spotify"
+        case .product:   return "Product"
         case .article, .bare: return nil
         }
     }
 
+    /// Products get a quiet ✦ to signal "enriched, more inside".
+    private var showsSpark: Bool { kind == .product }
+
     var body: some View {
-        if let cfg = config {
-            Text(cfg.label)
-                .appFont(11, .medium, relativeTo: .caption2)
-                .tracking(0.3)
-                .textCase(.uppercase)
-                .foregroundStyle(.white)
-                .fixedSize()
-                .padding(.horizontal, 12)
-                .frame(height: 22)
-                .background(cfg.bg)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+        if let label {
+            HStack(spacing: 4) {
+                Text(label)
+                    .appFont(10, .medium, relativeTo: .caption2)
+                    .tracking(0.3)
+                    .textCase(.uppercase)
+                if showsSpark {
+                    Text("✦").appFont(9, .medium, relativeTo: .caption2)
+                }
+            }
+            .foregroundStyle(.white.opacity(0.85))
+            .fixedSize()
+            .padding(.horizontal, 9)
+            .frame(height: 20)
+            .background(.ultraThinMaterial)
+            .background(AppColors.ink.opacity(0.45))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
         }
     }
 }
@@ -123,6 +133,7 @@ struct LinkThumbnail: View {
         case .tiktok:     return 9.0/16.0
         case .instagram:  return 4.0/5.0
         case .spotify:    return 1.0
+        case .product:    return 1.0
         case .article, .bare: return 3.0/2.0
         }
     }
@@ -140,7 +151,10 @@ struct LinkThumbnail: View {
 
     @ViewBuilder
     private var thumbnailContent: some View {
-        if let data = link.thumbnailData, let uiImage = UIImage(data: data) {
+        if let data = link.product?.imageData, let uiImage = UIImage(data: data) {
+            // Cached product image takes precedence for product links.
+            Image(uiImage: uiImage).resizable().scaledToFill()
+        } else if let data = link.thumbnailData, let uiImage = UIImage(data: data) {
             // Locally cached bytes — survives remote URL expiry.
             Image(uiImage: uiImage).resizable().scaledToFill()
         } else if let urlString = link.thumbnailURL, let url = URL(string: urlString) {
