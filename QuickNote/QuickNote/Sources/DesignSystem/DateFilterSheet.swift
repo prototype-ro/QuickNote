@@ -21,7 +21,7 @@ struct DateFilterSheet: View {
             .padding(.bottom, 20)
 
             Text("filter by date")
-                .font(.system(size: 22, weight: .bold))
+                .appFont(22, .bold, relativeTo: .title2)
                 .tracking(-0.5)
                 .foregroundStyle(AppColors.primaryText)
                 .padding(.bottom, 20)
@@ -41,7 +41,7 @@ struct DateFilterSheet: View {
                             Spacer()
                             if option == preset {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .appFont(13, .medium, relativeTo: .subheadline)
                                     .foregroundStyle(AppColors.primaryText)
                             }
                         }
@@ -64,7 +64,7 @@ struct DateFilterSheet: View {
                         Spacer()
                         if option == .custom {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .medium))
+                                .appFont(13, .medium, relativeTo: .subheadline)
                                 .foregroundStyle(AppColors.primaryText)
                         }
                     }
@@ -76,11 +76,11 @@ struct DateFilterSheet: View {
                     VStack(spacing: 10) {
                         DatePicker("from", selection: $customStart, displayedComponents: .date)
                             .datePickerStyle(.compact)
-                            .font(.system(size: 14, weight: .light))
+                            .appFont(14, .light, relativeTo: .subheadline)
                             .foregroundStyle(AppColors.secondaryText)
                         DatePicker("to", selection: $customEnd, in: customStart..., displayedComponents: .date)
                             .datePickerStyle(.compact)
-                            .font(.system(size: 14, weight: .light))
+                            .appFont(14, .light, relativeTo: .subheadline)
                             .foregroundStyle(AppColors.secondaryText)
                     }
                     .padding(.vertical, 10)
@@ -96,7 +96,7 @@ struct DateFilterSheet: View {
                     withAnimation(AppAnimation.springFluid) { option = .none }
                 } label: {
                     Text("clear filter")
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.tertiaryText)
                 }
                 .buttonStyle(.plain)

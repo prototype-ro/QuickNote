@@ -133,7 +133,7 @@ struct LibraryView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .semibold))
+                        .appFont(11, .semibold, relativeTo: .caption2)
                     Text("add link")
                         .appFont(13, .regular, relativeTo: .subheadline)
                         .tracking(-0.1)

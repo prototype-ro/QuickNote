@@ -414,7 +414,7 @@ struct MindView: View {
                 .overlay(Capsule().stroke(AppColors.ink.opacity(0.04), lineWidth: 0.5))
                 .overlay(alignment: .topTrailing) {
                     Text("\(displayedLinks.count)")
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .appFont(10.5, .semibold, relativeTo: .caption2)
                         .monospacedDigit()
                         .foregroundStyle(AppColors.primaryText)
                         .padding(.horizontal, 5)

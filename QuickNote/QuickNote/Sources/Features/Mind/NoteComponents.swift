@@ -578,7 +578,7 @@ struct CaptureBarView: View {
                                 startPoint: .top, endPoint: .bottom
                             )
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 13, weight: .semibold))
+                                .appFont(13, .semibold, relativeTo: .subheadline)
                                 .foregroundStyle(AppColors.onAccent)
                         }
                         .frame(width: 32, height: 32)

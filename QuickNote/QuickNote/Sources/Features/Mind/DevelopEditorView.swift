@@ -36,7 +36,7 @@ struct DevelopEditorView: View {
         HStack(spacing: 14) {
             Button { save(); onClose() } label: {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 16, weight: .regular))
+                    .appFont(16, .regular, relativeTo: .body)
                     .foregroundStyle(AppColors.secondaryText)
                     .frame(width: 36, height: 36)
                     .background(AppColors.ink.opacity(0.05))
@@ -56,7 +56,7 @@ struct DevelopEditorView: View {
 
             Button { monospace.toggle() } label: {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 13, weight: .regular))
+                    .appFont(13, .regular, relativeTo: .subheadline)
                     .foregroundStyle(monospace ? AppColors.onAccent : AppColors.secondaryText)
                     .frame(width: 36, height: 36)
                     .background(monospace

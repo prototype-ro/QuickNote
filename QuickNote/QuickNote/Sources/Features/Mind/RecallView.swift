@@ -55,7 +55,7 @@ struct RecallView: View {
                 .fill(AppColors.ink.opacity(0.22))
                 .frame(width: 40, height: 5)
             Image(systemName: "chevron.compact.down")
-                .font(.system(size: 18, weight: .regular))
+                .appFont(18, .regular, relativeTo: .title3)
                 .foregroundStyle(AppColors.tertiaryText)
         }
         .frame(maxWidth: .infinity)
@@ -104,7 +104,7 @@ struct RecallView: View {
                         LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom],
                                        startPoint: .top, endPoint: .bottom)
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 13, weight: .semibold))
+                            .appFont(13, .semibold, relativeTo: .subheadline)
                             .foregroundStyle(AppColors.onAccent)
                     }
                     .frame(width: 32, height: 32)
