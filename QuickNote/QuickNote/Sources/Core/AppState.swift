@@ -83,11 +83,18 @@ enum DateFilterOption: Equatable {
     }
 }
 
+// MARK: - Sort order (Fix 6)
+
+enum NoteSortOrder {
+    case newest, oldest, byType
+}
+
 // MARK: - Global state
 
 @Observable
 final class AppState {
-    var stage: AppStage = .splash
+    // Fix 13: skip splash after first launch
+    var stage: AppStage = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") ? .inbox : .splash
     var filter: FilterType = .all
     var libraryFilter: LibraryFilterType = .all
     var captureText: String = ""
@@ -95,9 +102,13 @@ final class AppState {
     var toastVisible: Bool = false
     var isSavingToLibrary: Bool = false
     var isShowingDigestDetail: Bool = false
-    var isPro: Bool = UserDefaults.standard.bool(forKey: "isPro") {
+    var isPro: Bool = true {
         didSet { UserDefaults.standard.set(isPro, forKey: "isPro") }
     }
+
+    // Mind keyword search
+    var mindSearchText: String = ""
+    var isSearching: Bool = false
 
     // Mind date + tag filters
     var mindDateFilter: DateFilterOption = .none
@@ -110,4 +121,36 @@ final class AppState {
     var libraryCustomStart: Date = Calendar.current.startOfDay(for: Date())
     var libraryCustomEnd: Date = Date()
     var libraryTagFilter: String? = nil
+
+    // Fix 6: sort order
+    var mindSortOrder: NoteSortOrder = .newest
+    var librarySortOrder: NoteSortOrder = .newest
+
+    // Capture experience enhancements
+    var capturedTextForProcessing: String = ""
+    var isQuietHours: Bool = false
+    var stressMode: Bool = false
+
+    // Corpus intelligence
+    /// A past note surfaced as an "echo" beneath a freshly captured note.
+    var echoNote: Note? = nil
+    /// The id of the new note the current echo belongs to (gates which card shows it).
+    var echoForNoteID: UUID? = nil
+    /// Whether the Recall (second-mind query) space is open.
+    var isRecalling: Bool = false
+    /// Set when a deep link (widget) asks to open the capture bar focused.
+    var shouldFocusCapture: Bool = false
+
+    // Settings + appearance
+    var isShowingSettings: Bool = false
+    var appearance: AppearanceMode = AppearanceMode(
+        rawValue: UserDefaults.standard.string(forKey: "appearance") ?? ""
+    ) ?? .system {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+    }
+
+    var firstNoteCeremonyShown: Bool {
+        get { UserDefaults.standard.bool(forKey: "firstNoteCeremonyShown") }
+        set { UserDefaults.standard.set(newValue, forKey: "firstNoteCeremonyShown") }
+    }
 }

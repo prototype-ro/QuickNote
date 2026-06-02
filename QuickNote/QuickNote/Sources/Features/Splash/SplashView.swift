@@ -34,6 +34,7 @@ struct SplashView: View {
                 Spacer()
 
                 GlossButton(title: "get started") {
+                    UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
                     withAnimation(AppAnimation.springFluid) {
                         appState.stage = .inbox
                     }

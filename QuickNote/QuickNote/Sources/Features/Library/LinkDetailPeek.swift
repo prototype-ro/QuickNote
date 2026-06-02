@@ -16,46 +16,57 @@ struct LinkDetailPeek: View {
     @State private var showDeleteAlert = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Thumbnail
-                    LinkThumbnail(link: link)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 4)
-                        .padding(.bottom, 16)
+        // Fix 11: ZStack ensures drag indicator always renders above NavigationStack
+        ZStack(alignment: .top) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Fix 11: 28pt top padding gives drag indicator clear space
+                        if link.kind != .article && link.kind != .bare {
+                            PlatformPill(kind: link.kind)
+                                .padding(.leading, 20)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 28)
+                                .padding(.bottom, 8)
+                        }
 
-                    Group {
-                        titleSection
-                        Divider().opacity(0.1).padding(.vertical, 14)
-                        urlSection
-                        Divider().opacity(0.1).padding(.vertical, 14)
-                        tagsSection
-                        Divider().opacity(0.1).padding(.vertical, 14)
-                        noteSection
-                        Divider().opacity(0.1).padding(.top, 14).padding(.bottom, 20)
-                        actionsSection
+                        // Thumbnail
+                        LinkThumbnail(link: link)
+                            .padding(.horizontal, 20)
+                            .padding(.top, link.kind == .article || link.kind == .bare ? 28 : 4)
+                            .padding(.bottom, 16)
+
+                        Group {
+                            titleSection
+                            // Fix 7: 20pt between sections
+                            Divider().opacity(0.1).padding(.vertical, 20)
+                            urlSection
+                            Divider().opacity(0.1).padding(.vertical, 20)
+                            tagsSection
+                            Divider().opacity(0.1).padding(.vertical, 14)
+                            noteSection
+                            Divider().opacity(0.1).padding(.top, 14).padding(.bottom, 20)
+                            actionsSection
+                        }
+                        .padding(.horizontal, 24)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
                 }
-                .padding(.bottom, 40)
+                .scrollDismissesKeyboard(.immediately)
+                .background(.ultraThinMaterial)
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
             }
-            .background(Color(hex: "F4F6F8"))
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    PlatformPill(kind: link.kind)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("done", action: onClose)
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(AppColors.primaryText)
-                }
-            }
+
+            // Fix 11: drag indicator on top with zIndex — never covered by image
+            Capsule()
+                .fill(AppColors.tertiaryText.opacity(0.45))
+                .frame(width: 36, height: 4)
+                .padding(.top, 8)
+                .allowsHitTesting(false)
         }
-        .alert("Remove link?", isPresented: $showDeleteAlert) {
-            Button("Remove", role: .destructive) { onDelete(link); onClose() }
+        .alert("Delete this link?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) { onDelete(link); onClose() }
             Button("Cancel", role: .cancel) {}
         } message: { Text("This cannot be undone.") }
     }
@@ -63,11 +74,12 @@ struct LinkDetailPeek: View {
     // MARK: - Title
 
     private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("TITLE")
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
+                .padding(.bottom, 6)
 
             if editingTitle {
                 TextField("title", text: $titleDraft, axis: .vertical)
@@ -92,10 +104,12 @@ struct LinkDetailPeek: View {
                     }
             }
 
+            // Fix 7: 6pt gap between title and "tap to edit" hint
             Text("tap to edit")
                 .font(.system(size: 11, weight: .light))
                 .foregroundStyle(AppColors.tertiaryText)
                 .opacity(editingTitle ? 0 : 0.7)
+                .padding(.top, 6)
         }
     }
 
@@ -122,7 +136,8 @@ struct LinkDetailPeek: View {
                 Text(link.urlString)
                     .font(.system(size: 12, weight: .light))
                     .tracking(-0.1)
-                    .foregroundStyle(AppColors.accentBlue)
+                    .foregroundStyle(Color(hex: "6B7280"))
+                    .underline()
                     .lineLimit(2)
                     .truncationMode(.middle)
             }
@@ -147,7 +162,7 @@ struct LinkDetailPeek: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(AppColors.tertiaryText)
                         .frame(width: 18, height: 18)
-                        .background(Color(hex: "0A0A0B").opacity(0.05))
+                        .background(AppColors.ink.opacity(0.05))
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -246,11 +261,23 @@ struct LinkDetailPeek: View {
                 .foregroundStyle(AppColors.primaryText)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 80)
+                // Fix 12: Done button for note TextEditor
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Done") {
+                            UIApplication.shared.sendAction(
+                                #selector(UIResponder.resignFirstResponder),
+                                to: nil, from: nil, for: nil
+                            )
+                        }
+                    }
+                }
             }
             .padding(10)
-            .background(Color.white.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.6), lineWidth: 0.5))
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.5), lineWidth: 0.5))
         }
     }
 
@@ -258,30 +285,28 @@ struct LinkDetailPeek: View {
 
     private var actionsSection: some View {
         HStack {
-            if !Link.samples.contains(where: { $0.id == link.id }) {
-                Button {
-                    onArchive(link)
-                    onClose()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: link.isArchived ? "archivebox.fill" : "archivebox")
-                            .font(.system(size: 12, weight: .light))
-                        Text(link.isArchived ? "unarchive" : "archive")
-                    }
-                    .font(.system(size: 13, weight: .light))
-                    .foregroundStyle(AppColors.secondaryText)
+            Button {
+                onArchive(link)
+                onClose()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: link.isArchived ? "archivebox.fill" : "archivebox")
+                        .font(.system(size: 12, weight: .light))
+                    Text(link.isArchived ? "unarchive" : "archive")
                 }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Button { showDeleteAlert = true } label: {
-                    Text("delete")
-                        .font(.system(size: 13, weight: .light))
-                        .foregroundStyle(AppColors.destructive)
-                }
-                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .light))
+                .foregroundStyle(AppColors.secondaryText)
             }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button { showDeleteAlert = true } label: {
+                Text("delete")
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundStyle(AppColors.destructive)
+            }
+            .buttonStyle(.plain)
         }
     }
 }

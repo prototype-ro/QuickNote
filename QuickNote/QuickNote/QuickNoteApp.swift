@@ -3,8 +3,18 @@
 import SwiftUI
 import SwiftData
 
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        .portrait
+    }
+}
+
 @main
 struct QuickNoteApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
     let container: ModelContainer = {
@@ -13,8 +23,11 @@ struct QuickNoteApp: App {
         do {
             return try ModelContainer(for: schema, configurations: config)
         } catch {
-            // Migration failed — wipe the store and start clean rather than crashing
+            // Migration/open failed. A notes app must NEVER silently destroy the
+            // user's data — preserve the old store as a recoverable backup BEFORE
+            // recreating, so nothing is lost irreversibly.
             let storeURL = config.url
+            Self.backupStore(at: storeURL)
             try? FileManager.default.removeItem(at: storeURL)
             try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
             try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
@@ -25,6 +38,23 @@ struct QuickNoteApp: App {
             }
         }
     }()
+
+    /// Copies the store (and its -wal/-shm siblings) to a timestamped backup folder
+    /// so a failed migration is recoverable instead of a permanent loss.
+    private static func backupStore(at storeURL: URL) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: storeURL.path) else { return }
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let backupDir = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups/\(stamp)", isDirectory: true)
+        try? fm.createDirectory(at: backupDir, withIntermediateDirectories: true)
+        for url in [storeURL,
+                    storeURL.appendingPathExtension("wal"),
+                    storeURL.appendingPathExtension("shm")] {
+            guard fm.fileExists(atPath: url.path) else { continue }
+            try? fm.copyItem(at: url, to: backupDir.appendingPathComponent(url.lastPathComponent))
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -50,15 +80,40 @@ struct QuickNoteApp: App {
               !items.isEmpty else { return }
 
         let ctx = container.mainContext
+        let processor = NoteProcessor()
         var inserted: [Link] = []
         for item in items {
-            guard let urlString = item["url"] else { continue }
-            let host = item["host"] ?? extractHost(from: urlString)
+            guard let content = item["content"] else { continue }
+            let type = item["type"] ?? "link"
+            let host = item["host"] ?? extractHost(from: content)
             let title = item["title"] ?? host
-            let kind = LinkKind.detect(from: urlString)
-            let link = Link(urlString: urlString, title: title, host: host, kind: kind)
-            ctx.insert(link)
-            inserted.append(link)
+
+            if type == "link" {
+                let kind = LinkKind.detect(from: content)
+                let link = Link(urlString: content, title: title, host: host, kind: kind)
+                let contextNote = item["note"] ?? ""
+                if !contextNote.isEmpty {
+                    link.userNote = contextNote
+                    // Also surface the annotation as a Note in the Mind inbox
+                    // so the user's thought isn't buried in Library only.
+                    let processed = processor.localClassify(rawText: contextNote)
+                    let noteType = NoteType(rawValue: processed.type.lowercased()) ?? .note
+                    let note = Note(rawText: contextNote, type: noteType,
+                                   tasks: processed.tasks, tags: processed.tags,
+                                   summary: processed.summary)
+                    ctx.insert(note)
+                }
+                ctx.insert(link)
+                inserted.append(link)
+            } else if type == "note", !content.isEmpty {
+                // Plain text shared from another app — goes directly to Mind inbox.
+                let processed = processor.localClassify(rawText: content)
+                let noteType = NoteType(rawValue: processed.type.lowercased()) ?? .note
+                let note = Note(rawText: content, type: noteType,
+                               tasks: processed.tasks, tags: processed.tags,
+                               summary: processed.summary)
+                ctx.insert(note)
+            }
         }
         try? ctx.save()
         try? FileManager.default.removeItem(at: fileURL)

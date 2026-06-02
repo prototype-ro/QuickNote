@@ -18,7 +18,7 @@ private struct GlossButtonStyle: ButtonStyle {
             LinearGradient(
                 stops: [
                     .init(color: Color(hex: "1a1a1d"), location: 0),
-                    .init(color: Color(hex: "0a0a0b"), location: 0.6),
+                    .init(color: AppColors.ink, location: 0.6),
                     .init(color: .black,               location: 1),
                 ],
                 startPoint: .top,

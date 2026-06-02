@@ -9,10 +9,12 @@ struct AIEnhancerInline: View {
     let isPro: Bool
     var onKeep: (String, EnhancementMode) -> Void
     var onDismiss: () -> Void
+    var onEnhancingChanged: (Bool) -> Void = { _ in }
 
     @State private var selectedMode: EnhancementMode? = nil
     @State private var enhancedText: String? = nil
     @State private var isEnhancing = false
+    @State private var errorMessage: String? = nil
     @State private var showProPrompt = false
     @State private var textOpacity: Double = 1
     @State private var processor = NoteProcessor()
@@ -25,6 +27,12 @@ struct AIEnhancerInline: View {
                 enhancingIndicator
             } else if let enhanced = enhancedText {
                 resultView(enhanced)
+            } else if let err = errorMessage {
+                Text(err)
+                    .font(.system(size: 12.5, weight: .light))
+                    .foregroundStyle(AppColors.tertiaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
             }
         }
         .sheet(isPresented: $showProPrompt) {
@@ -56,17 +64,17 @@ struct AIEnhancerInline: View {
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(0.3)
                 .textCase(.uppercase)
-                .foregroundStyle(isActive ? .white : AppColors.secondaryText)
+                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(
                     isActive
-                        ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "1a1a1d"), .black],
+                        ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom],
                                                        startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(Color(hex: "0A0A0B").opacity(0.06))
+                        : AnyShapeStyle(AppColors.ink.opacity(0.06))
                 )
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color(hex: "0A0A0B").opacity(isActive ? 0 : 0.04), lineWidth: 0.5))
+                .overlay(Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.04), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
@@ -97,10 +105,10 @@ struct AIEnhancerInline: View {
                 } label: {
                     Text("keep")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColors.onAccent)
                         .padding(.horizontal, 14)
                         .frame(height: 32)
-                        .background(Color(hex: "0A0A0B"))
+                        .background(AppColors.ink)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -125,10 +133,12 @@ struct AIEnhancerInline: View {
         selectedMode = mode
         isEnhancing = true
         enhancedText = nil
+        errorMessage = nil
+        onEnhancingChanged(true)
 
         Task {
             do {
-                let result = try await processor.enhanceNote(rawText: note.rawText, mode: mode)
+                let result = try await processor.enhanceNote(rawText: note.displayText ?? note.rawText, mode: mode)
                 await MainActor.run {
                     withAnimation(AppAnimation.springFluid) {
                         isEnhancing = false
@@ -138,11 +148,20 @@ struct AIEnhancerInline: View {
                         enhancedText = result
                         textOpacity = 1
                     }
+                    onEnhancingChanged(false)
                 }
             } catch {
                 await MainActor.run {
                     isEnhancing = false
                     selectedMode = nil
+                    onEnhancingChanged(false)
+                    withAnimation { errorMessage = "enhancement failed, try again" }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        await MainActor.run {
+                            withAnimation { errorMessage = nil }
+                        }
+                    }
                 }
             }
         }

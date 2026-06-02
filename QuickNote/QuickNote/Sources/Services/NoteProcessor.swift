@@ -12,16 +12,16 @@ public enum EnhancementMode: String, CaseIterable {
 
     var label: String { rawValue.capitalized }
 
-    var prompt: String {
+    var systemPrompt: String {
         switch self {
         case .clarity:
-            return "Rewrite the following note in clear, concise prose. Keep the exact same meaning and intent. Do not add information. Do not use bullet points. Return only the rewritten text, nothing else.\n\nNote: "
+            return "Rewrite the following note in clear, concise prose. Keep the exact same meaning and intent. Do not add information. Do not use bullet points. Return only the rewritten text, nothing else."
         case .expand:
-            return "The following is a brief idea or fragment. Expand it into a structured note with 2-3 sentences of context and one clearly stated angle or direction. Do not add speculation beyond what is implied. Return only the expanded note.\n\nNote: "
+            return "The following is a brief idea or fragment. Expand it into a structured note with 2-3 sentences of context and one clearly stated angle or direction. Do not add speculation beyond what is implied. Return only the expanded note."
         case .sharpen:
-            return "The following contains one or more tasks. Rewrite each task to be specific, actionable, and time-aware where possible. Extract implied deadlines or urgency. Return as a clean list, one task per line, no bullet characters. Return only the sharpened tasks.\n\nNote: "
+            return "The following contains one or more tasks. Rewrite each task to be specific, actionable, and time-aware where possible. Extract implied deadlines or urgency. Return as a clean list, one task per line, no bullet characters. Return only the sharpened tasks."
         case .reframe:
-            return "The following note may be anxious, vague, or emotionally charged. Rewrite it as a calm, clear observation or structured list of concrete next steps. Do not dismiss or minimize the emotion — just translate it into something actionable and readable. Return only the reframed text.\n\nNote: "
+            return "The following note may be anxious, vague, or emotionally charged. Rewrite it as a calm, clear observation or structured list of concrete next steps. Do not dismiss or minimize the emotion — just translate it into something actionable and readable. Return only the reframed text."
         }
     }
 }
@@ -85,8 +85,16 @@ public final class NoteProcessor {
         return useMock ? await mockProcess(rawText: rawText) : try await apiProcess(rawText: rawText)
     }
 
-    public func createNote(from rawText: String) async throws -> Note {
-        let processed = try await process(rawText: rawText)
+    public func createNote(from rawText: String) async -> Note {
+        let processed: ProcessedNoteResponse
+        do {
+            processed = try await process(rawText: rawText)
+        } catch {
+            // Capture must never lose a thought. If the API is unreachable,
+            // unconfigured, or returns garbage, fall back to local classification.
+            // rawText is the user's exact words and is always preserved.
+            processed = localClassify(rawText: rawText)
+        }
         let noteType = NoteType(rawValue: processed.type.lowercased()) ?? .note
         return Note(rawText: rawText, type: noteType, tasks: processed.tasks,
                     tags: processed.tags, summary: processed.summary)
@@ -114,36 +122,140 @@ public final class NoteProcessor {
 
     // MARK: - Related notes
 
-    public func findRelatedNoteIDs(for note: Note, from allNotes: [Note]) async -> [UUID] {
+    public func findRelated(for note: Note, allNotes: [Note]) async throws -> [UUID] {
+        let candidates = allNotes.filter { $0.id != note.id && !$0.isArchived }.prefix(20)
+        guard !candidates.isEmpty else { return [] }
+
         if useMock {
-            let noteWords = Set(note.rawText.lowercased()
+            let noteWords = Set((note.displayText ?? note.rawText).lowercased()
                 .components(separatedBy: .whitespacesAndNewlines)
                 .filter { $0.count > 3 })
             let noteTagSet = Set(note.tags)
-
-            let scored: [(Note, Int)] = allNotes
-                .filter { $0.id != note.id && !$0.isArchived }
-                .map { candidate in
-                    let cWords = Set(candidate.rawText.lowercased()
-                        .components(separatedBy: .whitespacesAndNewlines)
-                        .filter { $0.count > 3 })
-                    let tagScore = Set(candidate.tags).intersection(noteTagSet).count * 3
-                    let wordScore = cWords.intersection(noteWords).count
-                    return (candidate, tagScore + wordScore)
-                }
-                .filter { $0.1 > 0 }
-                .sorted { $0.1 > $1.1 }
-
+            let scored: [(Note, Int)] = candidates.map { c in
+                let cWords = Set((c.displayText ?? c.rawText).lowercased()
+                    .components(separatedBy: .whitespacesAndNewlines)
+                    .filter { $0.count > 3 })
+                let tagScore = Set(c.tags).intersection(noteTagSet).count * 3
+                let wordScore = cWords.intersection(noteWords).count
+                return (c, tagScore + wordScore)
+            }
+            .filter { $0.1 > 0 }
+            .sorted { $0.1 > $1.1 }
             return Array(scored.prefix(3).map { $0.0.id })
         }
-        // Real implementation would make a Claude API call
-        return []
+
+        guard !apiKey.isEmpty else { return [] }
+        guard let url = URL(string: baseURL) else { return [] }
+
+        let systemPrompt = "You are a semantic similarity engine. Given a source note and candidate notes, return a JSON array of the UUIDs of the 2-3 most semantically related candidates. If no candidates are strongly related, return an empty array. Respond ONLY with a valid JSON array of UUID strings, no other text."
+        let candidateLines = candidates
+            .map { "ID: \($0.id.uuidString)\nText: \($0.displayText ?? $0.rawText)" }
+            .joined(separator: "\n\n")
+        let userMessage = "Source note:\n\(note.displayText ?? note.rawText)\n\nCandidates:\n\(candidateLines)"
+
+        let body: [String: Any] = [
+            "model": kClaudeModelID,
+            "max_tokens": 256,
+            "system": systemPrompt,
+            "messages": [["role": "user", "content": userMessage]]
+        ]
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        guard let body = try? JSONSerialization.data(withJSONObject: body) else { return [] }
+        request.httpBody = body
+
+        guard let (data, response) = try? await performRequest(request),
+              let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else { return [] }
+
+        struct Resp: Codable {
+            struct Content: Codable { let type: String; let text: String? }
+            let content: [Content]
+        }
+        guard let resp = try? JSONDecoder().decode(Resp.self, from: data),
+              let text = resp.content.first(where: { $0.type == "text" })?.text else { return [] }
+
+        guard let start = text.firstIndex(of: "["),
+              let end = text.lastIndex(of: "]"),
+              start <= end else { return [] }
+        let jsonText = String(text[start...end])
+        guard let jsonData = jsonText.data(using: .utf8),
+              let uuidStrings = try? JSONDecoder().decode([String].self, from: jsonData) else { return [] }
+
+        return uuidStrings.compactMap { UUID(uuidString: $0) }
+    }
+
+    // MARK: - Recall synthesis
+
+    /// Stitches a one- or two-sentence answer to `query` using ONLY the user's
+    /// own `snippets`. The user's notes stay primary; this is connective tissue.
+    /// Only the provided snippets are sent to the API — nothing else from the corpus.
+    public func synthesize(query: String, snippets: [String]) async throws -> String {
+        let trimmedSnippets = snippets.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard !trimmedSnippets.isEmpty else { return "" }
+
+        if useMock {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            return "Across these notes, a thread runs through what you wrote about \(query.lowercased())."
+        }
+
+        guard !apiKey.isEmpty else { throw NoteProcessorError.missingAPIKey }
+        guard let url = URL(string: baseURL) else { throw NoteProcessorError.invalidURL }
+
+        let systemPrompt = """
+        You are the user's own memory speaking back to them. Answer their question \
+        using ONLY the notes provided — never invent facts or add outside knowledge. \
+        Write one or two sentences, in a calm, plain voice as if continuing the user's \
+        own thought. Do not list the notes; weave them. If the notes don't address the \
+        question, say so briefly. Return only the answer, no preamble.
+        """
+        let notesBlock = trimmedSnippets.enumerated()
+            .map { "Note \($0.offset + 1): \($0.element)" }
+            .joined(separator: "\n\n")
+        let userMessage = "Question: \(query)\n\nMy notes:\n\(notesBlock)"
+
+        let body: [String: Any] = [
+            "model": kClaudeModelID,
+            "max_tokens": 256,
+            "system": systemPrompt,
+            "messages": [["role": "user", "content": userMessage]]
+        ]
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await performRequest(request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NoteProcessorError.invalidResponse
+        }
+        struct Resp: Codable {
+            struct Content: Codable { let type: String; let text: String? }
+            let content: [Content]
+        }
+        let resp = try JSONDecoder().decode(Resp.self, from: data)
+        guard let text = resp.content.first(where: { $0.type == "text" })?.text else {
+            throw NoteProcessorError.invalidResponse
+        }
+        return Self.stripMarkdown(text)
     }
 
     // MARK: - Mock processing
 
     private func mockProcess(rawText: String) async -> ProcessedNoteResponse {
         try? await Task.sleep(nanoseconds: 400_000_000)
+        return localClassify(rawText: rawText)
+    }
+
+    /// Offline, on-device note classification. Pure-Swift heuristics, no network.
+    /// Used as the guaranteed fallback so a capture is never lost when the API
+    /// is unreachable, unconfigured, or returns an unparseable response.
+    public func localClassify(rawText: String) -> ProcessedNoteResponse {
         let text = rawText.lowercased()
         let words = text.components(separatedBy: .whitespacesAndNewlines)
         return ProcessedNoteResponse(
@@ -257,7 +369,8 @@ public final class NoteProcessor {
         let body: [String: Any] = [
             "model": kClaudeModelID,
             "max_tokens": 1024,
-            "messages": [["role": "user", "content": mode.prompt + rawText]]
+            "system": mode.systemPrompt,
+            "messages": [["role": "user", "content": rawText]]
         ]
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -279,7 +392,21 @@ public final class NoteProcessor {
         guard let text = resp.content.first(where: { $0.type == "text" })?.text else {
             throw NoteProcessorError.invalidResponse
         }
-        return text
+        return Self.stripMarkdown(text)
+    }
+
+    // MARK: - Markdown stripping
+
+    static func stripMarkdown(_ text: String) -> String {
+        var s = text
+        s = s.replacingOccurrences(of: #"(?m)^#{1,6} "#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: "**", with: "")
+        s = s.replacingOccurrences(of: "__", with: "")
+        s = s.replacingOccurrences(of: #"(?m)^[\-\•\*]\s+"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: "`", with: "")
+        s = s.replacingOccurrences(of: #"(?m)^\d+\.\s+"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
@@ -316,7 +443,13 @@ public final class NoteProcessor {
             throw NoteProcessorError.invalidResponse
         }
         do {
-            return try JSONDecoder().decode(ProcessedNoteResponse.self, from: jsonData)
+            let raw = try JSONDecoder().decode(ProcessedNoteResponse.self, from: jsonData)
+            return ProcessedNoteResponse(
+                type: raw.type,
+                tasks: raw.tasks.map { Self.stripMarkdown($0) },
+                tags: raw.tags,
+                summary: Self.stripMarkdown(raw.summary)
+            )
         } catch {
             throw NoteProcessorError.decodingError(error)
         }

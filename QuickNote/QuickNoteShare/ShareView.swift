@@ -6,8 +6,10 @@ struct ShareView: View {
     let urlString: String
     let title: String
     let host: String
-    var onSave: () -> Void
+    var onSave: (String) -> Void
     var onCancel: () -> Void
+
+    @State private var contextNote = ""
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -20,8 +22,8 @@ struct ShareView: View {
                 // Drag handle
                 HStack {
                     Capsule()
-                        .fill(Color(hex: "0A0A0B").opacity(0.18))
-                        .frame(width: 36, height: 5)
+                        .fill(Color(hex: "9CA3AF").opacity(0.6))
+                        .frame(width: 36, height: 4)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
@@ -32,18 +34,18 @@ struct ShareView: View {
                     Text("save to library")
                         .font(.system(size: 22, weight: .bold))
                         .tracking(-0.5)
-                        .foregroundColor(Color(hex: "0A0A0B"))
+                        .foregroundStyle(Color(hex: "0A0A0B"))
 
                     Text(host)
                         .font(.system(size: 13, weight: .light))
-                        .foregroundColor(Color(hex: "6B7280"))
+                        .foregroundStyle(Color(hex: "6B7280"))
                 }
                 .padding(.bottom, 18)
 
-                // URL preview pill
+                // URL preview
                 Text(urlString)
                     .font(.system(size: 11, weight: .light))
-                    .foregroundColor(Color(hex: "9CA3AF"))
+                    .foregroundStyle(Color(hex: "9CA3AF"))
                     .lineLimit(2)
                     .truncationMode(.middle)
                     .padding(.horizontal, 12)
@@ -55,24 +57,50 @@ struct ShareView: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.white.opacity(0.7), lineWidth: 0.5)
                     )
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 12)
+
+                // Optional context note
+                ZStack(alignment: .topLeading) {
+                    if contextNote.isEmpty {
+                        Text("add a note… (optional)")
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(Color(hex: "9CA3AF"))
+                            .padding(.top, 8)
+                            .padding(.leading, 4)
+                            .allowsHitTesting(false)
+                    }
+                    TextEditor(text: $contextNote)
+                        .font(.system(size: 13, weight: .light))
+                        .foregroundStyle(Color(hex: "0A0A0B"))
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 60)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.55))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(0.5), lineWidth: 0.5)
+                )
+                .padding(.bottom, 20)
 
                 // Buttons
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
                         Text("cancel")
                             .font(.system(size: 15, weight: .regular))
-                            .foregroundColor(Color(hex: "6B7280"))
+                            .foregroundStyle(Color(hex: "6B7280"))
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(Color(hex: "0A0A0B").opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                     }
 
-                    Button(action: onSave) {
+                    Button(action: { onSave(contextNote) }) {
                         Text("save")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(
@@ -88,7 +116,12 @@ struct ShareView: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
-            .background(Color(hex: "F4F6F8"))
+            .background {
+                ZStack {
+                    Rectangle().fill(.ultraThinMaterial)
+                    Color.white.opacity(0.45)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
         .ignoresSafeArea()

@@ -13,13 +13,14 @@ struct LibraryView: View {
     @State private var showAddLink = false
     @State private var pendingURL = ""
     @State private var peekLink: Link? = nil
-    @State private var showDateFilter = false
+    // Fix 6: sort sheet state
+    @State private var showSortSheet = false
 
     private var displayedLinks: [Link] {
         if appState.libraryFilter == .archived {
             return savedLinks.filter { $0.isArchived }
         }
-        var base = savedLinks.isEmpty ? Link.samples : savedLinks.filter { !$0.isArchived }
+        var base = savedLinks.filter { !$0.isArchived }
         if appState.libraryFilter != .all {
             base = base.filter { appState.libraryFilter.matches($0.kind) }
         }
@@ -33,16 +34,19 @@ struct LibraryView: View {
         if let tag = appState.libraryTagFilter {
             base = base.filter { $0.tags.contains(tag) }
         }
-        return base
+        switch appState.librarySortOrder {
+        case .newest: return base
+        case .oldest: return base.reversed()
+        case .byType: return base.sorted { $0.kind.rawValue < $1.kind.rawValue }
+        }
     }
 
     private var availableTags: [String] {
-        let base = savedLinks.isEmpty ? Link.samples : savedLinks.filter { !$0.isArchived }
-        return Array(Set(base.flatMap { $0.tags })).sorted()
+        Array(Set(savedLinks.filter { !$0.isArchived }.flatMap { $0.tags })).sorted()
     }
 
     private var totalLinkCount: Int {
-        savedLinks.isEmpty ? Link.samples.count : savedLinks.filter { !$0.isArchived }.count
+        savedLinks.filter { !$0.isArchived }.count
     }
 
     var body: some View {
@@ -52,8 +56,16 @@ struct LibraryView: View {
             VStack(spacing: 0) {
                 navRow
                 titleBlock
-                filterRow
+                // Fix 6: sort button to the right of filter chips
+                HStack(alignment: .center, spacing: 0) {
+                    filterRow
+                    librarySortButton
+                }
                 secondaryFilterRow
+                // Fix 10: 0.5pt divider replaces gradient fade
+                AppColors.hairline
+                    .frame(height: 0.5)
+                    .frame(maxWidth: .infinity)
                 linkGrid
             }
 
@@ -72,7 +84,7 @@ struct LibraryView: View {
                 onDelete: { deleteLink($0) }
             )
             .presentationDetents([.large])
-            .presentationBackground(Color(hex: "F4F6F8"))
+            .presentationBackground(.ultraThinMaterial)
             .presentationDragIndicator(.hidden)
         }
     }
@@ -81,6 +93,7 @@ struct LibraryView: View {
 
     private var navRow: some View {
         HStack {
+            // Fix 5: badge anchored to top-right of pill via overlay
             Button {
                 withAnimation(AppAnimation.springFluid) { appState.stage = .inbox }
             } label: {
@@ -90,6 +103,14 @@ struct LibraryView: View {
                         .font(.system(size: 13, weight: .regular))
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.primaryText)
+                }
+                .padding(.leading, 10)
+                .padding(.trailing, 12)
+                .frame(height: 32)
+                .background(AppColors.ink.opacity(0.06))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(AppColors.ink.opacity(0.04), lineWidth: 0.5))
+                .overlay(alignment: .topTrailing) {
                     Text("\(activeNotes.count)")
                         .font(.system(size: 10.5, weight: .semibold))
                         .monospacedDigit()
@@ -98,13 +119,8 @@ struct LibraryView: View {
                         .frame(minWidth: 18, minHeight: 18)
                         .background(AppColors.accentBlue)
                         .clipShape(Capsule())
+                        .offset(x: 4, y: -4)
                 }
-                .padding(.leading, 10)
-                .padding(.trailing, 12)
-                .frame(height: 32)
-                .background(Color(hex: "0A0A0B").opacity(0.06))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color(hex: "0A0A0B").opacity(0.04), lineWidth: 0.5))
             }
             .buttonStyle(.plain)
 
@@ -126,9 +142,9 @@ struct LibraryView: View {
                 .padding(.leading, 10)
                 .padding(.trailing, 12)
                 .frame(height: 32)
-                .background(Color(hex: "0A0A0B").opacity(0.06))
+                .background(AppColors.ink.opacity(0.06))
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color(hex: "0A0A0B").opacity(0.04), lineWidth: 0.5))
+                .overlay(Capsule().stroke(AppColors.ink.opacity(0.04), lineWidth: 0.5))
             }
             .buttonStyle(.plain)
         }
@@ -186,31 +202,64 @@ struct LibraryView: View {
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(0.3)
                 .textCase(.uppercase)
-                .foregroundStyle(isActive ? .white : AppColors.secondaryText)
+                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(
                     isActive
-                        ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "1a1a1d"), .black],
+                        ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom],
                                                        startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(Color(hex: "0A0A0B").opacity(0.06))
+                        : AnyShapeStyle(AppColors.ink.opacity(0.06))
                 )
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color(hex: "0A0A0B").opacity(isActive ? 0 : 0.04), lineWidth: 0.5))
+                .overlay(Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.04), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Date + Tag secondary filter row
+    // MARK: - Sort button (Fix 6)
+
+    private var librarySortButton: some View {
+        Button {
+            showSortSheet = true
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(appState.librarySortOrder == .newest
+                                 ? AppColors.secondaryText
+                                 : AppColors.primaryText)
+                .frame(width: 36, height: 36)
+                .background(appState.librarySortOrder == .newest
+                             ? AppColors.ink.opacity(0.04)
+                             : AppColors.ink.opacity(0.10))
+                .clipShape(Circle())
+                .overlay(Circle().stroke(AppColors.ink.opacity(0.06), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, 12)
+        .padding(.bottom, 14)
+        .confirmationDialog("Sort by", isPresented: $showSortSheet, titleVisibility: .visible) {
+            Button("Newest First") {
+                withAnimation(AppAnimation.springSnappy) { appState.librarySortOrder = .newest }
+            }
+            Button("Oldest First") {
+                withAnimation(AppAnimation.springSnappy) { appState.librarySortOrder = .oldest }
+            }
+            Button("Type") {
+                withAnimation(AppAnimation.springSnappy) { appState.librarySortOrder = .byType }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    // MARK: - Tag-only secondary filter row (Fix 6: DATE removed)
 
     @ViewBuilder
     private var secondaryFilterRow: some View {
-        let hasTags = !availableTags.isEmpty
-        let hasActiveFilters = appState.libraryDateFilter != .none || appState.libraryTagFilter != nil
-        if hasTags || hasActiveFilters {
+        let hasActiveTagFilter = appState.libraryTagFilter != nil
+        if !availableTags.isEmpty || hasActiveTagFilter {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    libraryDateFilterChip
                     ForEach(availableTags, id: \.self) { tag in
                         tagChip(tag, isActive: appState.libraryTagFilter == tag) {
                             withAnimation(AppAnimation.springSnappy) {
@@ -221,54 +270,7 @@ struct LibraryView: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .padding(.bottom, 10)
-        }
-    }
-
-    private var libraryDateFilterChip: some View {
-        let isActive = appState.libraryDateFilter != .none
-        return Button {
-            showDateFilter = true
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 9, weight: .medium))
-                Text(appState.libraryDateFilter.label)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .tracking(0.3)
-                    .textCase(.uppercase)
-                if isActive {
-                    Button {
-                        withAnimation(AppAnimation.springSnappy) { appState.libraryDateFilter = .none }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .foregroundStyle(isActive ? .white : AppColors.secondaryText)
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(
-                isActive
-                    ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "1a1a1d"), .black], startPoint: .top, endPoint: .bottom))
-                    : AnyShapeStyle(Color(hex: "6B7280").opacity(0.09))
-            )
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color(hex: "6B7280").opacity(isActive ? 0 : 0.15), lineWidth: 0.75))
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showDateFilter) {
-            DateFilterSheet(
-                option: Binding(get: { appState.libraryDateFilter }, set: { appState.libraryDateFilter = $0 }),
-                customStart: Binding(get: { appState.libraryCustomStart }, set: { appState.libraryCustomStart = $0 }),
-                customEnd: Binding(get: { appState.libraryCustomEnd }, set: { appState.libraryCustomEnd = $0 }),
-                onDismiss: { showDateFilter = false }
-            )
-            .presentationDetents([.medium])
-            .presentationBackground(Color(hex: "F4F6F8"))
-            .presentationDragIndicator(.hidden)
+            .padding(.vertical, 8)
         }
     }
 
@@ -277,16 +279,16 @@ struct LibraryView: View {
             Text("#\(label)")
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(0.2)
-                .foregroundStyle(isActive ? .white : AppColors.secondaryText)
+                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
                 .padding(.horizontal, 10)
-                .frame(height: 26)
+                .frame(height: 24)
                 .background(
                     isActive
-                        ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "1a1a1d"), .black], startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(Color(hex: "6B7280").opacity(0.09))
+                        ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom], startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(AppColors.ink.opacity(0.04))
                 )
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color(hex: "6B7280").opacity(isActive ? 0 : 0.15), lineWidth: 0.75))
+                .overlay(Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.06), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
@@ -294,27 +296,51 @@ struct LibraryView: View {
     // MARK: - Masonry grid
 
     private var linkGrid: some View {
-        ScrollView {
-            MasonryColumns(
-                links: displayedLinks,
-                onOpen: openLink,
-                onArchive: archiveLink,
-                onDelete: deleteLink,
-                onPeek: { link in peekLink = link }
-            )
-            .padding(.horizontal, 16)
-            .padding(.bottom, 40)
+        Group {
+            if displayedLinks.isEmpty {
+                emptyLibrary
+            } else {
+                ScrollView {
+                    MasonryColumns(
+                        links: displayedLinks,
+                        onOpen: openLink,
+                        onArchive: archiveLink,
+                        onDelete: deleteLink,
+                        onPeek: { link in peekLink = link }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 40)
+                }
+                .scrollDismissesKeyboard(.immediately)
+            }
         }
         .task {
             await fetchMissingMetadata()
         }
     }
 
+    private var emptyLibrary: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            Text("nothing saved yet.")
+                .font(.system(size: 15, weight: .light))
+                .tracking(-0.1)
+                .foregroundStyle(AppColors.tertiaryText)
+            Text("paste a URL in the capture bar to save a link.")
+                .font(.system(size: 12, weight: .light))
+                .tracking(-0.05)
+                .foregroundStyle(AppColors.tertiaryText.opacity(0.7))
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .padding(.horizontal, 40)
+    }
+
     // MARK: - Add link panel
 
     private var addLinkPanel: some View {
         ZStack(alignment: .bottom) {
-            Color(hex: "0A0A0B").opacity(0.18)
+            AppColors.ink.opacity(0.18)
                 .ignoresSafeArea()
                 .background(.ultraThinMaterial.opacity(0.3))
                 .onTapGesture {
@@ -324,7 +350,7 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Capsule()
-                        .fill(Color(hex: "0A0A0B").opacity(0.18))
+                        .fill(AppColors.ink.opacity(0.18))
                         .frame(width: 36, height: 5)
                 }
                 .frame(maxWidth: .infinity)
@@ -366,6 +392,13 @@ struct LibraryView: View {
                         .stroke(Color.white.opacity(0.7), lineWidth: 0.5)
                 )
                 .padding(.bottom, 14)
+                // Fix 12: Done button for URL field keyboard
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Done") { commitLink() }
+                    }
+                }
 
                 HStack(spacing: 10) {
                     Button {
@@ -376,7 +409,7 @@ struct LibraryView: View {
                             .foregroundStyle(AppColors.secondaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
-                            .background(Color(hex: "0A0A0B").opacity(0.05))
+                            .background(AppColors.ink.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                     }
                     .buttonStyle(.plain)
@@ -384,11 +417,11 @@ struct LibraryView: View {
                     Button(action: commitLink) {
                         Text("save")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.onAccent)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
                             .background(
-                                LinearGradient(colors: [Color(hex: "1a1a1d"), .black],
+                                LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom],
                                                startPoint: .top, endPoint: .bottom)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 13))
@@ -424,8 +457,7 @@ struct LibraryView: View {
     }
 
     private func openLink(_ link: Link) {
-        guard !Link.samples.contains(where: { $0.id == link.id }),
-              let url = URL(string: link.urlString.hasPrefix("http") ? link.urlString : "https://\(link.urlString)") else { return }
+        guard let url = URL(string: link.urlString.hasPrefix("http") ? link.urlString : "https://\(link.urlString)") else { return }
         openURL(url)
     }
 
@@ -437,12 +469,10 @@ struct LibraryView: View {
     }
 
     private func archiveLink(_ link: Link) {
-        guard !Link.samples.contains(where: { $0.id == link.id }) else { return }
         withAnimation(AppAnimation.springFluid) { link.isArchived = true }
     }
 
     private func deleteLink(_ link: Link) {
-        guard !Link.samples.contains(where: { $0.id == link.id }) else { return }
         withAnimation(AppAnimation.springFluid) { modelContext.delete(link) }
     }
 
@@ -468,9 +498,7 @@ struct LibraryView: View {
     }
 
     private func fetchMissingMetadata() async {
-        let sampleIDs = Set(Link.samples.map { $0.id })
-        let unfetched = savedLinks.filter { !sampleIDs.contains($0.id) && $0.thumbnailURL == nil }
-        for link in unfetched {
+        for link in savedLinks where link.thumbnailURL == nil {
             fetchAndApplyMetadata(link)
         }
     }
@@ -526,51 +554,74 @@ private struct SwipeableLinkCard: View {
 
     @State private var dragOffset: CGFloat = 0
     @State private var showDeleteAlert = false
+    // Fix 1: proper gesture anchor tracking
+    @State private var isDragging = false
+    @State private var dragAnchorOffset: CGFloat = 0
 
     private let actionWidth: CGFloat = 60
     private let revealThreshold: CGFloat = 44
-    private var fullReveal: CGFloat { actionWidth * 2 }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            if dragOffset < -8 {
-                HStack(spacing: 0) {
+        ZStack {
+            // Fix 1: right swipe → archive (left side)
+            if dragOffset > 4 {
+                HStack {
                     Button {
                         withAnimation(AppAnimation.springFluid) { dragOffset = 0 }
                         onArchive(link)
                     } label: {
-                        Image(systemName: "archivebox")
-                            .font(.system(size: 14, weight: .light))
-                            .foregroundStyle(AppColors.primaryText)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color(hex: "0A0A0B").opacity(0.06))
+                        VStack(spacing: 4) {
+                            Image(systemName: "archivebox")
+                                .font(.system(size: 13, weight: .light))
+                            Text("ARCHIVE")
+                                .font(.system(size: 9, weight: .medium))
+                                .tracking(0.3)
+                        }
+                        .foregroundStyle(AppColors.secondaryText)
+                        .frame(width: actionWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(AppColors.ink.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
-                    .frame(width: actionWidth)
-
-                    Button { showDeleteAlert = true } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 14, weight: .light))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(AppColors.destructive)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: actionWidth)
+                    Spacer()
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+
+            // Fix 1: left swipe → delete (right side)
+            if dragOffset < -4 {
+                HStack {
+                    Spacer()
+                    Button { showDeleteAlert = true } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 13, weight: .light))
+                            Text("DELETE")
+                                .font(.system(size: 9, weight: .medium))
+                                .tracking(0.3)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(width: actionWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(AppColors.destructive)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             LinkCard(link: link)
                 .offset(x: dragOffset)
-                .gesture(swipeGesture)
-                .onTapGesture {
-                    if dragOffset < 0 {
-                        withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
-                    } else {
-                        onOpen(link)
+                .simultaneousGesture(swipeGesture)
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        if dragOffset != 0 {
+                            withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
+                        } else {
+                            onOpen(link)
+                        }
                     }
-                }
+                )
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: 0.5)
                         .onEnded { _ in
@@ -579,8 +630,9 @@ private struct SwipeableLinkCard: View {
                         }
                 )
         }
-        .alert("Remove link?", isPresented: $showDeleteAlert) {
-            Button("Remove", role: .destructive) {
+        // Fix 1: updated alert text
+        .alert("Delete this link?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
                 withAnimation(AppAnimation.springFluid) { dragOffset = 0 }
                 onDelete(link)
             }
@@ -593,27 +645,33 @@ private struct SwipeableLinkCard: View {
     }
 
     private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
             .onChanged { value in
                 let h = abs(value.translation.width)
                 let v = abs(value.translation.height)
-                guard h > v * 1.1 else { return }
-                let raw = dragOffset == 0
-                    ? min(0, value.translation.width)
-                    : min(0, dragOffset + value.translation.width)
-                dragOffset = max(raw, -fullReveal)
+                guard h > v * 2.0 else { return }
+                if !isDragging {
+                    isDragging = true
+                    dragAnchorOffset = dragOffset
+                }
+                let newOffset = dragAnchorOffset + value.translation.width
+                dragOffset = max(-actionWidth, min(actionWidth, newOffset))
             }
             .onEnded { value in
+                isDragging = false
                 let h = abs(value.translation.width)
                 let v = abs(value.translation.height)
-                guard h > v else { return }
+                guard h > v * 1.5 else {
+                    withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
+                    return
+                }
                 withAnimation(AppAnimation.springSnappy) {
-                    if value.translation.width < -revealThreshold {
-                        dragOffset = -fullReveal
-                    } else if value.translation.width > revealThreshold / 2 {
-                        dragOffset = 0
+                    if dragOffset > revealThreshold / 2 {
+                        dragOffset = actionWidth
+                    } else if dragOffset < -(revealThreshold / 2) {
+                        dragOffset = -actionWidth
                     } else {
-                        dragOffset = dragOffset < -revealThreshold ? -fullReveal : 0
+                        dragOffset = 0
                     }
                 }
             }

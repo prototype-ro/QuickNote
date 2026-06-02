@@ -113,17 +113,17 @@ struct HeroMark: View {
 struct WallpaperView: View {
     var body: some View {
         ZStack {
-            Color(hex: "F0F2F4")
+            AppColors.background
 
             RadialGradient(
-                colors: [Color(red: 0.84, green: 0.87, blue: 0.91).opacity(0.70), .clear],
+                colors: [Color.dynamic(light: "D7DEE8", dark: "1B2230").opacity(0.70), .clear],
                 center: UnitPoint(x: 0.30, y: 0),
                 startRadius: 0,
                 endRadius: 340
             )
 
             RadialGradient(
-                colors: [Color(red: 0.88, green: 0.89, blue: 0.91).opacity(0.60), .clear],
+                colors: [Color.dynamic(light: "E1E3E8", dark: "171A22").opacity(0.60), .clear],
                 center: UnitPoint(x: 0.80, y: 1),
                 startRadius: 0,
                 endRadius: 260

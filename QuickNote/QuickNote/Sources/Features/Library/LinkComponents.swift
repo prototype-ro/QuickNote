@@ -11,7 +11,7 @@ struct MockThumb: View {
     private var palette: (Color, Color, Color) {
         switch kind {
         case .youtube:   return (Color(hex: "1a1a1d"), Color(hex: "2a2a30"), Color(hex: "16161a"))
-        case .tiktok:    return (Color(hex: "0a0a0b"), Color(hex: "1a1a22"), Color(hex: "0a0a14"))
+        case .tiktok:    return (AppColors.ink, Color(hex: "1a1a22"), Color(hex: "0a0a14"))
         case .instagram: return (Color(hex: "3a2a3a"), Color(hex: "5a3a5a"), Color(hex: "2a1a2a"))
         case .spotify:   return (Color(hex: "0e1a14"), Color(hex: "1a2a20"), Color(hex: "0a140e"))
         case .article:   return (Color(hex: "e8e6e1"), Color(hex: "d8d4cc"), Color(hex: "cdc8be"))
@@ -59,7 +59,7 @@ struct MockThumb: View {
             Text("A")
                 .font(.system(size: 64, weight: .regular, design: .serif))
                 .italic()
-                .foregroundStyle(Color(hex: "0A0A0B").opacity(0.18))
+                .foregroundStyle(AppColors.ink.opacity(0.18))
         case .spotify:
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(0..<8, id: \.self) { i in
@@ -85,7 +85,7 @@ struct PlatformPill: View {
     private var config: (label: String, bg: Color)? {
         switch kind {
         case .youtube:        return ("YouTube",   Color(hex: "FF3D3D").opacity(0.92))
-        case .tiktok:         return ("TikTok",    Color(hex: "0A0A0B").opacity(0.85))
+        case .tiktok:         return ("TikTok",    AppColors.ink.opacity(0.85))
         case .instagram:      return ("Instagram", Color(hex: "E1306C").opacity(0.90))
         case .spotify:        return ("Spotify",   Color(hex: "1DB954").opacity(0.90))
         case .article, .bare: return nil
@@ -95,12 +95,13 @@ struct PlatformPill: View {
     var body: some View {
         if let cfg = config {
             Text(cfg.label)
-                .font(.system(size: 9, weight: .medium))
-                .tracking(0.5)
+                .font(.system(size: 11, weight: .medium))
+                .tracking(0.3)
                 .textCase(.uppercase)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 7)
-                .frame(height: 18)
+                .fixedSize()
+                .padding(.horizontal, 12)
+                .frame(height: 22)
                 .background(cfg.bg)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
@@ -133,7 +134,7 @@ struct LinkThumbnail: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(hex: "0A0A0B").opacity(0.08), lineWidth: 0.5)
+                    .stroke(AppColors.ink.opacity(0.08), lineWidth: 0.5)
             )
     }
 
@@ -179,7 +180,7 @@ struct LinkCard: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
                         .frame(height: 16)
-                        .background(Color(hex: "0A0A0B").opacity(0.78))
+                        .background(AppColors.ink.opacity(0.78))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(6)
@@ -196,20 +197,21 @@ struct LinkCard: View {
                     .lineLimit(2)
                     .foregroundStyle(AppColors.primaryText)
 
+                // Fix 4: secondary card text at #6B7280 minimum for accessibility
                 HStack(spacing: 5) {
                     Text(link.author ?? link.host)
                         .font(.system(size: 10.5, weight: .light))
                         .tracking(-0.05)
-                        .foregroundStyle(AppColors.tertiaryText)
+                        .foregroundStyle(Color(hex: "6B7280"))
                         .lineLimit(1)
 
                     if let readTime = link.readTime {
                         Text("·")
                             .font(.system(size: 10.5, weight: .light))
-                            .foregroundStyle(AppColors.tertiaryText)
+                            .foregroundStyle(Color(hex: "6B7280"))
                         Text(readTime)
                             .font(.system(size: 10.5, weight: .light))
-                            .foregroundStyle(AppColors.tertiaryText)
+                            .foregroundStyle(Color(hex: "6B7280"))
                     }
                 }
             }

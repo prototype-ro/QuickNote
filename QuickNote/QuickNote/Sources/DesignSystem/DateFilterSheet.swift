@@ -13,7 +13,7 @@ struct DateFilterSheet: View {
             // Handle
             HStack {
                 Capsule()
-                    .fill(Color(hex: "0A0A0B").opacity(0.18))
+                    .fill(AppColors.ink.opacity(0.18))
                     .frame(width: 36, height: 5)
             }
             .frame(maxWidth: .infinity)

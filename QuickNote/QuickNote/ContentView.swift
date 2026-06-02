@@ -29,6 +29,23 @@ struct ContentView: View {
         }
         .animation(AppAnimation.springFluid, value: appState.stage)
         .gesture(swipeGesture)
+        .onOpenURL { url in handleDeepLink(url) }
+        .preferredColorScheme(appState.appearance.colorScheme)
+    }
+
+    // MARK: - Deep links (widget)
+
+    /// Routes `quicknote://` URLs opened from the widget into app state.
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == WidgetRoute.scheme else { return }
+        appState.isQuietHours = false
+        appState.isRecalling = false
+        withAnimation(AppAnimation.springFluid) {
+            appState.stage = .inbox
+        }
+        if url.host == "capture" {
+            appState.shouldFocusCapture = true
+        }
     }
 
     // MARK: - Edge swipe for Mind ↔ Library

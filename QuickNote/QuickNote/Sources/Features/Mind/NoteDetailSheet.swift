@@ -12,7 +12,6 @@ struct NoteDetailSheet: View {
     @Environment(AppState.self) private var appState
     @Query(filter: #Predicate<Note> { !$0.isArchived }) private var allNotes: [Note]
 
-    @State private var checkedItems: Set<Int> = []
     @State private var showDeleteAlert = false
     @State private var showEnhancer = false
     @State private var showTypePicker = false
@@ -20,6 +19,14 @@ struct NoteDetailSheet: View {
     @State private var newTagText = ""
     @State private var relatedNoteIDs: [UUID] = []
     @State private var processor = NoteProcessor()
+    @State private var isEnhancing = false
+    @State private var sparkPulse = false
+    @State private var isEditing = false
+    @State private var editDraft = ""
+    @State private var showRevertConfirm = false
+    @State private var sheetDragOffset: CGFloat = 0
+    // Fix 8: flag to suppress animation during active drag
+    @State private var isDragging = false
 
     private var relatedNotes: [Note] {
         relatedNoteIDs.compactMap { id in allNotes.first { $0.id == id } }
@@ -27,16 +34,28 @@ struct NoteDetailSheet: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color(hex: "0A0A0B").opacity(0.18)
+            AppColors.ink.opacity(0.18)
                 .ignoresSafeArea()
                 .background(.ultraThinMaterial.opacity(0.3))
                 .onTapGesture(perform: onClose)
 
             sheetContent
+                .offset(y: sheetDragOffset)
+                // Fix 8: no animation while finger is down; spring on release
+                .animation(isDragging ? nil : AppAnimation.springFluid, value: sheetDragOffset)
                 .transition(.move(edge: .bottom))
         }
         .ignoresSafeArea()
-        .alert("Delete note?", isPresented: $showDeleteAlert) {
+        .confirmationDialog("Revert to original?", isPresented: $showRevertConfirm, titleVisibility: .visible) {
+            Button("Revert", role: .destructive) {
+                note.displayText = nil
+                note.enhancementMode = nil
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The AI-enhanced version will be removed.")
+        }
+        .alert("Delete this note?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive, action: onDelete)
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -51,7 +70,7 @@ struct NoteDetailSheet: View {
             Button("Cancel", role: .cancel) {}
         }
         .task {
-            relatedNoteIDs = await processor.findRelatedNoteIDs(for: note, from: allNotes)
+            relatedNoteIDs = (try? await processor.findRelated(for: note, allNotes: allNotes)) ?? []
         }
     }
 
@@ -59,6 +78,7 @@ struct NoteDetailSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             dragHandle
 
+            // Fix 12: keyboard dismisses on scroll
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     headerRow.padding(.bottom, 8)
@@ -75,6 +95,14 @@ struct NoteDetailSheet: View {
                             },
                             onDismiss: {
                                 withAnimation(AppAnimation.springFluid) { showEnhancer = false }
+                            },
+                            onEnhancingChanged: { enhancing in
+                                isEnhancing = enhancing
+                                withAnimation(enhancing
+                                    ? AppAnimation.springGentle.repeatForever(autoreverses: true)
+                                    : AppAnimation.springSnappy) {
+                                    sparkPulse = enhancing
+                                }
                             }
                         )
                         .padding(.bottom, 18)
@@ -88,41 +116,75 @@ struct NoteDetailSheet: View {
                         Divider().opacity(0.15).padding(.vertical, 16)
                     }
 
-                    tagsSection.padding(.bottom, 18)
+                    // Fix 7: increased section spacing
+                    tagsSection.padding(.bottom, 20)
 
                     if !note.summary.isEmpty {
-                        summarySection.padding(.bottom, 22)
+                        summarySection.padding(.bottom, 20)
                     }
 
-                    if !relatedNotes.isEmpty {
+                    revertSection.padding(.bottom, 22)
+
+                    if allNotes.count >= 2 && !relatedNotes.isEmpty {
                         seeAlsoSection.padding(.bottom, 22)
                     }
 
+                    // Fix 7: 28pt minimum before archive/delete row
                     bottomActions
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 34)
             }
+            .scrollDismissesKeyboard(.immediately)
         }
-        .background(Color(hex: "F4F6F8"))
+        .background {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.white.opacity(0.45)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(Color.white.opacity(0.6), lineWidth: 0.5)
                 .padding(.bottom, -28)
         )
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.88)
+        .frame(maxHeight: ((UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.height ?? 852) * 0.88)
     }
 
     private var dragHandle: some View {
         HStack {
             Capsule()
-                .fill(Color(hex: "0A0A0B").opacity(0.18))
+                .fill(AppColors.ink.opacity(0.18))
                 .frame(width: 36, height: 5)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 10)
         .padding(.bottom, 14)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // Fix 8: 1:1 mapping, no animation while finger down
+                    isDragging = true
+                    sheetDragOffset = max(0, value.translation.height)
+                }
+                .onEnded { value in
+                    isDragging = false
+                    // Fix 8: velocity check using iOS 17 DragGesture.Value.velocity
+                    let shouldDismiss = value.translation.height > 80 || value.velocity.height > 800
+                    if shouldDismiss {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            sheetDragOffset = 0
+                        }
+                        onClose()
+                    } else {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                            sheetDragOffset = 0
+                        }
+                    }
+                }
+        )
     }
 
     private var headerRow: some View {
@@ -149,56 +211,130 @@ struct NoteDetailSheet: View {
     }
 
     private var noteTextArea: some View {
-        ZStack(alignment: .topTrailing) {
-            Text(note.displayText ?? note.rawText)
-                .font(.system(size: 22, weight: .bold))
-                .tracking(-0.5)
-                .lineSpacing(4)
-                .foregroundStyle(AppColors.primaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        let content = note.displayText ?? note.rawText
+        let isLong = content.count > 120
+        let textFont: Font = isLong
+            ? .system(size: 15, weight: .light)
+            : .system(size: 22, weight: .bold)
+        let tracking: CGFloat = isLong ? -0.15 : -0.5
+        let lineSpacing: CGFloat = isLong ? 7.5 : 4
 
-            Button {
-                withAnimation(AppAnimation.springFluid) { showEnhancer.toggle() }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(showEnhancer
-                              ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "1a1a1d"), .black], startPoint: .top, endPoint: .bottom))
-                              : AnyShapeStyle(Color(hex: "0A0A0B").opacity(0.06)))
-                        .frame(width: 28, height: 28)
-                    Text("✦")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(showEnhancer ? Color.white : AppColors.secondaryText)
-                }
+        return ZStack(alignment: .topTrailing) {
+            if isEditing {
+                TextEditor(text: $editDraft)
+                    .font(textFont)
+                    .tracking(tracking)
+                    .foregroundStyle(AppColors.primaryText)
+                    .scrollContentBackground(.hidden)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 80)
+                    .padding(.trailing, 72)
+                    // Fix 12: Done button for TextEditor
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") {
+                                let trimmed = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmed.isEmpty { note.displayText = trimmed }
+                                withAnimation(AppAnimation.springSnappy) { isEditing = false }
+                            }
+                        }
+                    }
+            } else {
+                Text(content)
+                    .font(textFont)
+                    .tracking(tracking)
+                    .lineSpacing(lineSpacing)
+                    .foregroundStyle(AppColors.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 72)
             }
-            .buttonStyle(.plain)
+
+            HStack(spacing: 8) {
+                // Fix 3: darker bg, defined border, stronger glyph color
+                Button {
+                    if isEditing {
+                        let trimmed = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty { note.displayText = trimmed }
+                        withAnimation(AppAnimation.springSnappy) { isEditing = false }
+                    } else {
+                        editDraft = note.displayText ?? note.rawText
+                        withAnimation(AppAnimation.springSnappy) { isEditing = true }
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(AppColors.ink.opacity(0.10))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle().stroke(AppColors.ink.opacity(0.12), lineWidth: 0.5)
+                            )
+                        Image(systemName: isEditing ? "checkmark" : "pencil")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(hex: "3C3C3E"))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation(AppAnimation.springFluid) { showEnhancer.toggle() }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(showEnhancer
+                                  ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom], startPoint: .top, endPoint: .bottom))
+                                  : AnyShapeStyle(AppColors.ink.opacity(0.10)))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle().stroke(
+                                    showEnhancer ? Color.clear : AppColors.ink.opacity(0.12),
+                                    lineWidth: 0.5
+                                )
+                            )
+                        Text("✦")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(showEnhancer ? AppColors.onAccent : Color(hex: "3C3C3E"))
+                    }
+                }
+                .buttonStyle(.plain)
+                .scaleEffect(sparkPulse ? 1.08 : 1.0)
+                .animation(
+                    isEnhancing
+                        ? AppAnimation.springGentle.repeatForever(autoreverses: true)
+                        : AppAnimation.springSnappy,
+                    value: sparkPulse
+                )
+            }
             .offset(x: 4, y: -4)
         }
     }
 
     private var actionItemsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Fix 7: 14pt gap between section label and content
             Text("ACTION ITEMS")
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
-                .padding(.bottom, 10)
+                .padding(.bottom, 14)
 
             ForEach(Array(note.tasks.enumerated()), id: \.offset) { index, task in
                 actionItem(index: index, text: task).frame(minHeight: 36)
             }
+
+            dueDateRow
         }
     }
 
     private func actionItem(index: Int, text: String) -> some View {
-        let checked = checkedItems.contains(index)
+        let checked = note.isTaskDone(index)
         return HStack(spacing: 12) {
             ZStack {
                 if checked {
                     Circle().fill(AppColors.primaryText).frame(width: 18, height: 18)
                     Image(systemName: "checkmark")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColors.onAccent)
                 } else {
                     Circle().stroke(AppColors.tertiaryText, lineWidth: 1.4).frame(width: 18, height: 18)
                 }
@@ -214,12 +350,61 @@ struct NoteDetailSheet: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if checked { checkedItems.remove(index) } else { checkedItems.insert(index) }
+            // Persist completion on the note — survives closing the sheet.
+            note.setTask(index, done: !checked)
+            HapticEngine.classify()
         }
     }
 
+    // MARK: - Due date
+
+    @ViewBuilder
+    private var dueDateRow: some View {
+        let isOverdue = note.dueDate.map { $0 < Date() } ?? false
+        HStack(spacing: 8) {
+            Image(systemName: "calendar")
+                .font(.system(size: 12, weight: .light))
+                .foregroundStyle(isOverdue ? AppColors.destructive : AppColors.tertiaryText)
+
+            if note.dueDate == nil {
+                Button {
+                    note.dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+                } label: {
+                    Text("add due date")
+                        .font(.system(size: 13, weight: .light))
+                        .foregroundStyle(AppColors.secondaryText)
+                }
+                .buttonStyle(.plain)
+            } else {
+                DatePicker(
+                    "",
+                    selection: Binding(get: { note.dueDate ?? Date() }, set: { note.dueDate = $0 }),
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .labelsHidden()
+                .font(.system(size: 13, weight: .light))
+
+                if isOverdue {
+                    Text("overdue")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(AppColors.destructive)
+                }
+
+                Spacer()
+
+                Button { note.dueDate = nil } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppColors.tertiaryText)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 14)
+    }
+
     private var tagsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("TAGS")
                     .font(.system(size: 10.5, weight: .medium))
@@ -233,11 +418,13 @@ struct NoteDetailSheet: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(AppColors.tertiaryText)
                         .frame(width: 18, height: 18)
-                        .background(Color(hex: "0A0A0B").opacity(0.05))
+                        .background(AppColors.ink.opacity(0.05))
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
             }
+            // Fix 7: 14pt gap between label and content
+            .padding(.bottom, 14)
 
             if !note.tags.isEmpty {
                 FlowLayout(spacing: 6) {
@@ -245,6 +432,7 @@ struct NoteDetailSheet: View {
                         tagPill(tag)
                     }
                 }
+                .padding(.bottom, 10)
             }
 
             if showAddTagField {
@@ -314,11 +502,13 @@ struct NoteDetailSheet: View {
     }
 
     private var summarySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Fix 7: 14pt gap between section label and content
             Text("SUMMARY")
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
+                .padding(.bottom, 14)
 
             Text(note.summary)
                 .font(.system(size: 15, weight: .light))
@@ -326,6 +516,26 @@ struct NoteDetailSheet: View {
                 .tracking(-0.1)
                 .lineSpacing(6)
                 .foregroundStyle(AppColors.secondaryText)
+        }
+    }
+
+    // MARK: - Revert
+
+    @ViewBuilder
+    private var revertSection: some View {
+        if let display = note.displayText, display != note.rawText {
+            Button {
+                showRevertConfirm = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 12, weight: .light))
+                    Text("revert to original")
+                        .font(.system(size: 13, weight: .light))
+                }
+                .foregroundStyle(AppColors.secondaryText)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -339,7 +549,7 @@ struct NoteDetailSheet: View {
                 .foregroundStyle(AppColors.tertiaryText)
 
             VStack(spacing: 0) {
-                ForEach(relatedNotes) { related in
+                ForEach(Array(relatedNotes.enumerated()), id: \.element.id) { i, related in
                     Button {
                         withAnimation(AppAnimation.springFluid) {
                             appState.activeNote = related
@@ -348,7 +558,7 @@ struct NoteDetailSheet: View {
                         HStack(spacing: 10) {
                             CatIcon(kind: related.type, size: 11, color: AppColors.tertiaryText)
 
-                            Text(related.rawText)
+                            Text(related.displayText ?? related.rawText)
                                 .font(.system(size: 13, weight: .light))
                                 .tracking(-0.1)
                                 .foregroundStyle(AppColors.primaryText)
@@ -361,9 +571,11 @@ struct NoteDetailSheet: View {
                                 .font(.system(size: 11, weight: .light))
                                 .foregroundStyle(AppColors.tertiaryText)
                         }
-                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
                     }
                     .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(AppAnimation.springSnappy.delay(Double(i) * 0.04), value: relatedNoteIDs)
 
                     if related.id != relatedNotes.last?.id {
                         Divider().opacity(0.1)
@@ -404,7 +616,8 @@ struct NoteDetailSheet: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.top, 4)
+        // Fix 7: 28pt minimum before archive/delete row
+        .padding(.top, 28)
     }
 
     // MARK: - Helpers
@@ -424,7 +637,15 @@ struct NoteDetailSheet: View {
     private var dayDescription: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
-        return "a \(formatter.string(from: note.createdAt).lowercased()) afternoon"
+        let hour = Calendar.current.component(.hour, from: note.createdAt)
+        let timeOfDay: String
+        switch hour {
+        case 5..<12:  timeOfDay = "morning"
+        case 12..<17: timeOfDay = "afternoon"
+        case 17..<21: timeOfDay = "evening"
+        default:      timeOfDay = "night"
+        }
+        return "a \(formatter.string(from: note.createdAt).lowercased()) \(timeOfDay)"
     }
 }
 

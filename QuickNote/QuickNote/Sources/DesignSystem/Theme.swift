@@ -4,45 +4,94 @@
 //
 
 import SwiftUI
+import UIKit
+
+// MARK: - Appearance
+
+/// User's appearance preference. `.system` follows the device setting.
+public enum AppearanceMode: String, CaseIterable {
+    case system, light, dark
+
+    public var label: String {
+        switch self {
+        case .system: return "system"
+        case .light:  return "light"
+        case .dark:   return "dark"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .system: return "circle.lefthalf.filled"
+        case .light:  return "sun.max"
+        case .dark:   return "moon"
+        }
+    }
+
+    /// The SwiftUI scheme to force, or `nil` to follow the system.
+    public var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+}
 
 // MARK: - Colors
 
 public enum AppColors {
-    // Base Canvas
-    public static let background = Color(hex: "F0F2F4")
-    public static let surface = Color.white
-    public static let overlay = Color(hex: "F0F2F4").opacity(0.80)
+    // Base Canvas — adaptive
+    public static let background = Color.dynamic(light: "F0F2F4", dark: "0E0F12")
+    public static let surface = Color.dynamic(light: "FFFFFF", dark: "1B1D21")
+    public static let overlay = background.opacity(0.80)
 
-    // Typography
-    public static let primaryText = Color(hex: "0A0A0B")
-    public static let secondaryText = Color(hex: "6B7280")
-    public static let tertiaryText = Color(hex: "9CA3AF")
+    // Typography — adaptive
+    public static let primaryText = Color.dynamic(light: "0A0A0B", dark: "F2F3F5")
+    public static let secondaryText = Color.dynamic(light: "6B7280", dark: "9BA1AC")
+    public static let tertiaryText = Color.dynamic(light: "9CA3AF", dark: "6C727C")
 
-    // Accent
-    public static let accent = Color(hex: "0A0A0B")          // black — CTAs, active chips
+    /// Adaptive "ink" — near-black in light, near-white in dark. Used for text,
+    /// subtle opacity fills, and hairline borders alike (so `.opacity(x)` flips
+    /// correctly in both schemes). Replaces the old hardcoded `Color(hex: "0A0A0B")`.
+    public static let ink = primaryText
+    /// Adaptive divider/hairline (was `E5E7EB`).
+    public static let hairline = Color.dynamic(light: "E5E7EB", dark: "2A2D33")
+    /// Dimming scrim behind modal sheets — stays dark in BOTH schemes (a scrim
+    /// darkens; it must not flip to white in dark mode like `ink` would).
+    public static let scrim = Color.dynamic(light: "0A0A0B", dark: "000000")
+
+    // Accent / CTA — adaptive so dark buttons invert to light in dark mode
+    public static let accent = Color.dynamic(light: "0A0A0B", dark: "F2F3F5")
+    /// Foreground placed on `accent` / CTA gradients (white in light, dark in dark).
+    public static let onAccent = Color.dynamic(light: "FFFFFF", dark: "0A0A0B")
+    /// CTA gradient endpoints (filter chip / send button / etc).
+    public static let ctaTop = Color.dynamic(light: "1a1a1d", dark: "FFFFFF")
+    public static let ctaBottom = Color.dynamic(light: "000000", dark: "E4E6EA")
+
     public static let accentBlue = Color(hex: "7AA7FF")      // halo, library badge
     public static let accentSage = Color(hex: "9BC4A8")
     public static let accentAmber = Color(hex: "E8B26A")
     public static let accentRose = Color(hex: "E59AAA")
     public static let accentViolet = Color(hex: "A89BD8")
     public static let accentSlate = Color(hex: "9AA4B2")
-    public static let accentSoft = Color(hex: "E5E7EB")
+    public static let accentSoft = hairline
     public static let destructive = Color(hex: "EF4444")     // delete red (DESIGN.md)
 
     // Chip states
-    public static let chipInactiveBackground = Color(hex: "0A0A0B").opacity(0.06)
-    public static let chipActiveBackground = Color(hex: "0A0A0B")
-    public static let chipInactiveText = Color(hex: "6B7280")
-    public static let chipActiveText = Color.white
+    public static let chipInactiveBackground = ink.opacity(0.06)
+    public static let chipActiveBackground = accent
+    public static let chipInactiveText = secondaryText
+    public static let chipActiveText = onAccent
 
     // Note type badge backgrounds (tinted glass)
     public static func badgeBackground(for type: NoteType) -> Color {
         switch type {
-        case .task:   return Color(hex: "0A0A0B").opacity(0.08)
-        case .idea:   return Color(hex: "0A0A0B").opacity(0.06)
-        case .note:   return Color(hex: "0A0A0B").opacity(0.05)
-        case .link:   return Color(hex: "0A0A0B").opacity(0.07)
-        case .digest: return Color(hex: "0A0A0B").opacity(0.04)
+        case .task:   return ink.opacity(0.08)
+        case .idea:   return ink.opacity(0.06)
+        case .note:   return ink.opacity(0.05)
+        case .link:   return ink.opacity(0.07)
+        case .digest: return ink.opacity(0.04)
         }
     }
 }
@@ -185,6 +234,14 @@ public extension View {
 // MARK: - Color Extension
 
 extension Color {
+    /// A color that resolves to `light` or `dark` based on the active interface
+    /// style — the foundation of the app's adaptive theming.
+    static func dynamic(light: String, dark: String) -> Color {
+        Color(uiColor: UIColor { traits in
+            UIColor(Color(hex: traits.userInterfaceStyle == .dark ? dark : light))
+        })
+    }
+
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0

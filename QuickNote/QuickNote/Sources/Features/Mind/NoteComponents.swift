@@ -1,6 +1,92 @@
 // NoteComponents.swift — NoteCard, Badge, CatIcon, FilterChips, CaptureBarView
 
 import SwiftUI
+import UIKit
+
+// MARK: - Haptics
+
+enum HapticEngine {
+    static func submit() {
+        let g = UIImpactFeedbackGenerator(style: .medium)
+        g.prepare()
+        g.impactOccurred()
+    }
+
+    static func noteArrived() {
+        let g = UIImpactFeedbackGenerator(style: .light)
+        g.prepare()
+        g.impactOccurred()
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 90_000_000)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+    }
+
+    static func classify() {
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    /// A single soft, low-intensity tap — the whisper of a memory surfacing.
+    /// Gentler than `noteArrived`'s double-tap; used when an echo appears.
+    static func echo() {
+        let g = UIImpactFeedbackGenerator(style: .soft)
+        g.prepare()
+        g.impactOccurred(intensity: 0.45)
+    }
+
+    static func archive() {
+        let g = UIImpactFeedbackGenerator(style: .soft)
+        g.prepare()
+        g.impactOccurred(intensity: 0.7)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.4)
+        }
+    }
+
+    static func typeChange() {
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.6)
+    }
+}
+
+// MARK: - InkReveal
+
+struct InkReveal: ViewModifier {
+    var active: Bool
+    @State private var progress: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .mask(
+                GeometryReader { geo in
+                    HStack(spacing: 0) {
+                        Color.black
+                            .frame(width: geo.size.width * progress)
+                        LinearGradient(
+                            colors: [.black, .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: min(geo.size.width * 0.10, 20))
+                        Color.clear
+                    }
+                }
+            )
+            .onAppear {
+                if active {
+                    withAnimation(.easeOut(duration: 0.44)) { progress = 1 }
+                } else {
+                    progress = 1
+                }
+            }
+    }
+}
+
+extension View {
+    func inkReveal(active: Bool = true) -> some View {
+        modifier(InkReveal(active: active))
+    }
+}
 
 // MARK: - CatIcon
 
@@ -30,6 +116,9 @@ struct CatIcon: View {
 
 struct NoteBadge: View {
     let kind: NoteType
+    var animate: Bool = false
+
+    @State private var appeared = false
 
     var body: some View {
         HStack(spacing: 5) {
@@ -42,9 +131,21 @@ struct NoteBadge: View {
         .foregroundStyle(AppColors.primaryText)
         .padding(.horizontal, 9)
         .frame(height: 22)
-        .background(Color(hex: "0A0A0B").opacity(0.04))
+        .background(AppColors.ink.opacity(0.04))
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color(hex: "0A0A0B").opacity(0.07), lineWidth: 0.5))
+        .overlay(Capsule().stroke(AppColors.ink.opacity(0.07), lineWidth: 0.5))
+        .scaleEffect(appeared ? 1.0 : (animate ? 0.65 : 1.0))
+        .opacity(appeared ? 1.0 : (animate ? 0.0 : 1.0))
+        .onAppear {
+            guard animate else { appeared = true; return }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 320_000_000)
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.58)) {
+                    appeared = true
+                }
+                HapticEngine.classify()
+            }
+        }
     }
 }
 
@@ -52,56 +153,138 @@ struct NoteBadge: View {
 
 struct NoteCard: View {
     let note: Note
+    var repeatCount: Int = 0
+    var isNew: Bool = false
     var onTap: () -> Void = {}
     var onArchive: () -> Void = {}
     var onDelete: () -> Void = {}
 
     @State private var dragOffset: CGFloat = 0
     @State private var showDeleteAlert = false
+    @State private var isDragging = false
+    @State private var dragAnchorOffset: CGFloat = 0
+    @State private var showTypeFlash: Bool = false
+    @State private var flashedType: NoteType = .note
 
     private let actionWidth: CGFloat = 76
     private let revealThreshold: CGFloat = 55
-    private var fullReveal: CGFloat { actionWidth * 2 }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
 
     private var relativeTime: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: note.createdAt, relativeTo: Date())
+        Self.relativeFormatter.localizedString(for: note.createdAt, relativeTo: Date())
     }
+
+    private static let dueFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
+    }()
 
     private var subtitle: String {
         if note.type == .task && !note.tasks.isEmpty {
             let c = note.tasks.count
-            return "\(c) action item\(c == 1 ? "" : "s") extracted"
+            let done = note.completedTaskCount
+            var s = done > 0 ? "\(done)/\(c) done" : "\(c) action item\(c == 1 ? "" : "s") extracted"
+            if let due = note.dueDate {
+                s += " · due \(Self.dueFormatter.string(from: due))"
+            }
+            return s
         } else if !note.tags.isEmpty {
             return "tagged · \(note.tags.prefix(3).joined(separator: ", "))"
         }
         return ""
     }
 
+    private var typeWarmthColor: Color {
+        switch note.type {
+        case .task:  return Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.06)
+        case .idea:  return Color(red: 0.72, green: 0.55, blue: 1.0).opacity(0.06)
+        case .note:  return .clear
+        case .link:  return Color(red: 0.47, green: 0.67, blue: 1.0).opacity(0.05)
+        case .digest: return .clear
+        }
+    }
+
     var body: some View {
-        ZStack(alignment: .trailing) {
-            if dragOffset < -8 {
-                HStack(spacing: 0) {
-                    archiveButton
-                    deleteButton
+        ZStack {
+            if dragOffset > 4 {
+                HStack {
+                    Button {
+                        withAnimation(AppAnimation.springFluid) { dragOffset = 0 }
+                        HapticEngine.archive()
+                        onArchive()
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "archivebox")
+                                .font(.system(size: 15, weight: .light))
+                            Text("ARCHIVE")
+                                .font(.system(size: 10, weight: .medium))
+                                .tracking(0.3)
+                        }
+                        .foregroundStyle(AppColors.secondaryText)
+                        .frame(width: actionWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(AppColors.ink.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
                 }
-                .frame(width: fullReveal)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
 
-            cardFace
-                .offset(x: dragOffset)
-                .gesture(swipeGesture)
-                .onTapGesture {
-                    if dragOffset < 0 {
-                        withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
-                    } else {
-                        onTap()
+            if dragOffset < -4 {
+                HStack {
+                    Spacer()
+                    Button { showDeleteAlert = true } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 15, weight: .light))
+                            Text("DELETE")
+                                .font(.system(size: 10, weight: .medium))
+                                .tracking(0.3)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(width: actionWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(AppColors.destructive)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
+                    .buttonStyle(.plain)
                 }
+            }
+
+            Button {
+                if dragOffset != 0 {
+                    withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
+                } else {
+                    onTap()
+                }
+            } label: {
+                cardFace
+            }
+            .buttonStyle(.plain)
+            .offset(x: dragOffset)
+            .simultaneousGesture(cardDragGesture)
+
+            // Type change flash badge
+            if showTypeFlash {
+                VStack {
+                    HStack {
+                        Spacer()
+                        NoteBadge(kind: flashedType)
+                            .transition(.scale(scale: 0.7).combined(with: .opacity))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .allowsHitTesting(false)
+            }
         }
-        .alert("Delete note?", isPresented: $showDeleteAlert) {
+        .alert("Delete this note?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 withAnimation(AppAnimation.springFluid) { dragOffset = 0 }
                 onDelete()
@@ -114,54 +297,25 @@ struct NoteCard: View {
         }
     }
 
-    private var archiveButton: some View {
-        Button {
-            withAnimation(AppAnimation.springFluid) { dragOffset = 0 }
-            onArchive()
-        } label: {
-            VStack(spacing: 4) {
-                Image(systemName: "archivebox")
-                    .font(.system(size: 15, weight: .light))
-                Text("archive")
-                    .font(.system(size: 10, weight: .medium))
-                    .tracking(0.3)
-                    .textCase(.uppercase)
-            }
-            .foregroundStyle(AppColors.primaryText)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: "0A0A0B").opacity(0.06))
-        }
-        .buttonStyle(.plain)
-        .frame(width: actionWidth)
-    }
-
-    private var deleteButton: some View {
-        Button { showDeleteAlert = true } label: {
-            VStack(spacing: 4) {
-                Image(systemName: "trash")
-                    .font(.system(size: 15, weight: .light))
-                Text("delete")
-                    .font(.system(size: 10, weight: .medium))
-                    .tracking(0.3)
-                    .textCase(.uppercase)
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColors.destructive)
-        }
-        .buttonStyle(.plain)
-        .frame(width: actionWidth)
-    }
-
     private var cardFace: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                NoteBadge(kind: note.type)
+                NoteBadge(kind: note.type, animate: isNew)
                 Spacer()
-                Text(relativeTime)
-                    .font(.system(size: 12, weight: .light))
-                    .tracking(-0.1)
-                    .foregroundStyle(AppColors.tertiaryText)
+                HStack(spacing: 6) {
+                    Text(relativeTime)
+                        .font(.system(size: 12, weight: .light))
+                        .tracking(-0.1)
+                        .foregroundStyle(Color(hex: "6B7280"))
+                    if repeatCount >= 3 {
+                        Circle()
+                            .fill(Color(hex: "6B7280"))
+                            .frame(width: 6, height: 6)
+                            .contextMenu {
+                                Text("you've noted this \(repeatCount) times")
+                            }
+                    }
+                }
             }
 
             Text(note.displayText ?? note.rawText)
@@ -181,39 +335,89 @@ struct NoteCard: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                typeWarmthColor
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.6), lineWidth: 0.5)
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.28), lineWidth: 3.5)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.75), Color.white.opacity(0.0)],
+                            startPoint: .top,
+                            endPoint: UnitPoint(x: 0.5, y: 0.55)
+                        ),
+                        lineWidth: 1.5
+                    )
+            }
         )
     }
 
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+    // Single gesture handles both horizontal swipe (archive/delete) and vertical flick (type cycle)
+    private var cardDragGesture: some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
             .onChanged { value in
                 let h = abs(value.translation.width)
                 let v = abs(value.translation.height)
-                guard h > v * 1.1 else { return }
-                let raw = dragOffset == 0
-                    ? min(0, value.translation.width)
-                    : min(0, dragOffset + value.translation.width)
-                dragOffset = max(raw, -fullReveal)
+                // Only track horizontal movement for swipe
+                guard h > v * 1.8 else { return }
+                if !isDragging {
+                    isDragging = true
+                    dragAnchorOffset = dragOffset
+                }
+                let newOffset = dragAnchorOffset + value.translation.width
+                dragOffset = max(-actionWidth, min(actionWidth, newOffset))
             }
             .onEnded { value in
+                isDragging = false
                 let h = abs(value.translation.width)
-                let v = abs(value.translation.height)
-                guard h > v else { return }
+                let v = value.translation.height
+                let absV = abs(v)
+
+                // Upward flick: clearly vertical, upward, past threshold
+                if v < -44 && absV > h * 1.8 {
+                    withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
+                    cycleNoteType()
+                    return
+                }
+
+                // Horizontal swipe resolution
+                guard h > absV * 1.5 else {
+                    withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
+                    return
+                }
                 withAnimation(AppAnimation.springSnappy) {
-                    if value.translation.width < -revealThreshold {
-                        dragOffset = -fullReveal
-                    } else if value.translation.width > revealThreshold / 2 {
-                        dragOffset = 0
+                    if dragOffset > revealThreshold / 2 {
+                        dragOffset = actionWidth
+                    } else if dragOffset < -(revealThreshold / 2) {
+                        dragOffset = -actionWidth
                     } else {
-                        dragOffset = dragOffset < -revealThreshold ? -fullReveal : 0
+                        dragOffset = 0
                     }
                 }
             }
+    }
+
+    private func cycleNoteType() {
+        let order: [NoteType] = [.idea, .task, .note]
+        let current = order.firstIndex(of: note.type) ?? 0
+        let next = order[(current + 1) % order.count]
+        flashedType = next
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.65)) {
+            note.type = next
+            showTypeFlash = true
+        }
+        HapticEngine.typeChange()
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            withAnimation(.easeOut(duration: 0.2)) { showTypeFlash = false }
+        }
     }
 }
 
@@ -232,17 +436,17 @@ struct FilterChips: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 6)
         }
-        .background(
-            LinearGradient(
-                stops: [
-                    .init(color: Color(hex: "F0F2F4").opacity(0.92), location: 0),
-                    .init(color: Color(hex: "F0F2F4").opacity(0.78), location: 0.7),
-                    .init(color: Color(hex: "F0F2F4").opacity(0.00), location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .background(.ultraThinMaterial)
+        .fixedSize(horizontal: false, vertical: true)
+        .mask(
+            HStack(spacing: 0) {
+                Rectangle()
+                LinearGradient(
+                    colors: [.black, .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 40)
+            }
         )
     }
 
@@ -255,19 +459,19 @@ struct FilterChips: View {
                 .font(.system(size: 11, weight: .medium))
                 .tracking(0.3)
                 .textCase(.uppercase)
-                .foregroundStyle(isActive ? .white : AppColors.secondaryText)
+                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
                 .padding(.horizontal, 10)
                 .frame(height: 28)
                 .background(
                     isActive
                         ? AnyShapeStyle(LinearGradient(
-                            colors: [Color(hex: "1a1a1d"), .black],
+                            colors: [AppColors.ctaTop, AppColors.ctaBottom],
                             startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(Color(hex: "0A0A0B").opacity(0.06))
+                        : AnyShapeStyle(AppColors.ink.opacity(0.06))
                 )
                 .clipShape(Capsule())
                 .overlay(
-                    Capsule().stroke(Color(hex: "0A0A0B").opacity(isActive ? 0 : 0.04), lineWidth: 0.5)
+                    Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.04), lineWidth: 0.5)
                 )
         }
         .buttonStyle(.plain)
@@ -283,21 +487,39 @@ private let capturePlaceholders = [
     "leave it here. come back later.",
 ]
 
+private let stressPlaceholders = [
+    "let it out.",
+    "no filter needed.",
+    "what's weighing on you?",
+    "it's safe here.",
+]
+
 struct CaptureBarView: View {
     @Binding var text: String
     var onSubmit: () -> Void
     var staticPlaceholder: String? = nil
     var savingToLibrary: Bool = false
+    var urlDetected: Bool = false
     var voiceManager: VoiceCaptureManager? = nil
+    var stressMode: Bool = false
+    /// Flips to request keyboard focus (e.g. from a widget deep link).
+    var focusTrigger: Bool = false
+    var onFocusHandled: () -> Void = {}
 
     @FocusState private var focused: Bool
-    @State private var placeholderIndex = 0
+    @State private var placeholderIndex = Int.random(in: 0..<capturePlaceholders.count)
     @State private var recordingPulse = false
+    @State private var submitScale: CGFloat = 1.0
+
+    private var placeholder: String {
+        if let s = staticPlaceholder { return s }
+        if stressMode { return stressPlaceholders[placeholderIndex % stressPlaceholders.count] }
+        return capturePlaceholders[placeholderIndex]
+    }
 
     var body: some View {
         VStack(spacing: 6) {
             HStack(spacing: 10) {
-                // Mic button — left, visible when text is empty and not saving
                 if text.isEmpty && !savingToLibrary, let voiceManager {
                     micButton(voiceManager)
                         .transition(.scale(scale: 0.7).combined(with: .opacity))
@@ -306,15 +528,14 @@ struct CaptureBarView: View {
 
                 ZStack(alignment: .leading) {
                     if text.isEmpty {
-                        Text(savingToLibrary
-                             ? "saving to library..."
-                             : (staticPlaceholder ?? capturePlaceholders[placeholderIndex]))
+                        Text(savingToLibrary ? "saving to library..." : placeholder)
                             .font(.system(size: 15, weight: .light))
                             .tracking(-0.15)
-                            .foregroundStyle(AppColors.tertiaryText)
-                            .id(savingToLibrary ? "saving" : "\(placeholderIndex)")
+                            .foregroundStyle(stressMode && !savingToLibrary
+                                ? AppColors.secondaryText
+                                : AppColors.tertiaryText)
+                            .id(savingToLibrary ? "saving" : "placeholder")
                             .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.36), value: placeholderIndex)
                             .animation(.easeInOut(duration: 0.2), value: savingToLibrary)
                     }
 
@@ -329,19 +550,20 @@ struct CaptureBarView: View {
                 }
 
                 if !text.isEmpty {
-                    Button(action: onSubmit) {
+                    Button(action: handleSubmit) {
                         ZStack {
                             LinearGradient(
-                                colors: [Color(hex: "1a1a1d"), .black],
+                                colors: [AppColors.ctaTop, AppColors.ctaBottom],
                                 startPoint: .top, endPoint: .bottom
                             )
                             Image(systemName: "arrow.up")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(AppColors.onAccent)
                         }
                         .frame(width: 32, height: 32)
                         .clipShape(Circle())
                         .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                        .scaleEffect(submitScale)
                     }
                     .buttonStyle(.plain)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
@@ -351,20 +573,40 @@ struct CaptureBarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(minHeight: 52)
-            .background(.ultraThinMaterial)
+            .background(
+                ZStack {
+                    Rectangle().fill(.ultraThinMaterial)
+                    if stressMode {
+                        LinearGradient(
+                            colors: [Color(red: 0.47, green: 0.67, blue: 1.0).opacity(0.06), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    }
+                }
+            )
             .clipShape(RoundedRectangle(cornerRadius: 18))
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(
                         voiceManager?.isRecording == true
-                            ? Color(hex: "0A0A0B").opacity(recordingPulse ? 0.55 : 0.22)
+                            ? AppColors.ink.opacity(recordingPulse ? 0.55 : 0.22)
                             : Color.white.opacity(0.6),
                         lineWidth: voiceManager?.isRecording == true ? 1.5 : 0.5
                     )
                     .animation(AppAnimation.springGentle, value: recordingPulse)
             )
 
-            // Voice error message
+            if urlDetected && !text.isEmpty {
+                Text("saving to library")
+                    .font(.system(size: 11, weight: .light))
+                    .tracking(-0.05)
+                    .foregroundStyle(AppColors.tertiaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .transition(.opacity)
+            }
+
             if let err = voiceManager?.errorMessage {
                 Text(err)
                     .font(.system(size: 12, weight: .light))
@@ -385,17 +627,36 @@ struct CaptureBarView: View {
             }
         }
         .onChange(of: voiceManager?.transcribedText ?? "") { _, newText in
-            if !newText.isEmpty {
-                text = newText
+            if !newText.isEmpty { text = newText }
+        }
+        .onChange(of: focusTrigger) { _, trigger in
+            if trigger {
+                focused = true
+                onFocusHandled()
             }
         }
-        .task(id: staticPlaceholder) {
-            guard staticPlaceholder == nil else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 4_200_000_000)
-                guard !Task.isCancelled else { return }
-                placeholderIndex = (placeholderIndex + 1) % capturePlaceholders.count
+        .onAppear {
+            if focusTrigger {
+                focused = true
+                onFocusHandled()
             }
+        }
+    }
+
+    private func handleSubmit() {
+        // Ignore whitespace-only input — don't animate the button away for nothing.
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        HapticEngine.submit()
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.55)) {
+            submitScale = 1.15
+        }
+        withAnimation(.easeIn(duration: 0.14).delay(0.1)) {
+            submitScale = 0.0
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 160_000_000)
+            submitScale = 1.0
+            onSubmit()
         }
     }
 
@@ -404,12 +665,12 @@ struct CaptureBarView: View {
         ZStack {
             Circle()
                 .fill(manager.isRecording
-                      ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "1a1a1d"), .black], startPoint: .top, endPoint: .bottom))
-                      : AnyShapeStyle(Color(hex: "0A0A0B").opacity(0.06)))
+                      ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom], startPoint: .top, endPoint: .bottom))
+                      : AnyShapeStyle(AppColors.ink.opacity(0.06)))
                 .frame(width: 32, height: 32)
             Image(systemName: manager.isRecording ? "mic.fill" : "mic")
                 .font(.system(size: 13, weight: manager.isRecording ? .semibold : .light))
-                .foregroundStyle(manager.isRecording ? Color.white : AppColors.primaryText)
+                .foregroundStyle(manager.isRecording ? AppColors.onAccent : AppColors.primaryText)
         }
         .gesture(
             DragGesture(minimumDistance: 0)
@@ -418,7 +679,6 @@ struct CaptureBarView: View {
                 }
                 .onEnded { _ in
                     manager.stopRecording()
-                    // Small delay so transcription task can finalize
                     Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 150_000_000)
                         if !manager.transcribedText.isEmpty {
