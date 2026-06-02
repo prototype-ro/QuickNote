@@ -21,7 +21,7 @@ struct AIEnhancerInline: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            modeChips
+            if enhancedText == nil { enhanceButton }
 
             if isEnhancing {
                 enhancingIndicator
@@ -40,41 +40,29 @@ struct AIEnhancerInline: View {
         }
     }
 
-    private var modeChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(EnhancementMode.allCases, id: \.self) { mode in
-                    modeChip(mode)
-                }
-            }
-        }
-    }
-
-    private func modeChip(_ mode: EnhancementMode) -> some View {
-        let isActive = selectedMode == mode
-        return Button {
+    private var enhanceButton: some View {
+        Button {
             guard !isEnhancing else { return }
             if !isPro {
                 showProPrompt = true
                 return
             }
-            runEnhancement(mode)
+            runEnhancement(.enhance)
         } label: {
-            Text(mode.label)
-                .appFont(10.5, .medium, relativeTo: .caption2)
-                .tracking(0.3)
-                .textCase(.uppercase)
-                .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(
-                    isActive
-                        ? AnyShapeStyle(LinearGradient(colors: [AppColors.ctaTop, AppColors.ctaBottom],
-                                                       startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(AppColors.ink.opacity(0.06))
-                )
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.04), lineWidth: 0.5))
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .appFont(11, .medium, relativeTo: .caption2)
+                Text("enhance")
+                    .appFont(11, .medium, relativeTo: .caption2)
+                    .tracking(0.3)
+                    .textCase(.uppercase)
+            }
+            .foregroundStyle(AppColors.secondaryText)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(AppColors.ink.opacity(0.06))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(AppColors.ink.opacity(0.04), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
