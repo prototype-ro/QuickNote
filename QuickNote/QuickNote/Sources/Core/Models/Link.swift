@@ -4,7 +4,7 @@ import Foundation
 import SwiftData
 
 public enum LinkKind: String, Codable {
-    case youtube, tiktok, instagram, spotify, article, bare
+    case youtube, tiktok, instagram, spotify, article, bare, product
 
     public var platformLabel: String? {
         switch self {
@@ -12,6 +12,7 @@ public enum LinkKind: String, Codable {
         case .tiktok:    return "TikTok"
         case .instagram: return "Instagram"
         case .spotify:   return "Spotify"
+        case .product:   return "Product"
         case .article, .bare: return nil
         }
     }
@@ -42,6 +43,9 @@ public final class Link {
     /// signed URLs that expire after a few days — we download and persist the
     /// image here so the preview survives. Stored outside the main store.
     @Attribute(.externalStorage) public var thumbnailData: Data?
+    /// AI product enrichment (price/brand/image). nil → ordinary link.
+    /// Optional → migration-safe. Drives the PRODUCT ✦ marker + product section.
+    public var product: ProductInfo? = nil
     public var tags: [String]
     public var userNote: String?
     public var aspectRatio: Double
@@ -59,6 +63,7 @@ public final class Link {
         readTime: String? = nil,
         thumbnailURL: String? = nil,
         thumbnailData: Data? = nil,
+        product: ProductInfo? = nil,
         tags: [String] = [],
         userNote: String? = nil,
         aspectRatio: Double = 1.0,
@@ -75,6 +80,7 @@ public final class Link {
         self.readTime = readTime
         self.thumbnailURL = thumbnailURL
         self.thumbnailData = thumbnailData
+        self.product = product
         self.tags = tags
         self.userNote = userNote
         self.aspectRatio = aspectRatio
