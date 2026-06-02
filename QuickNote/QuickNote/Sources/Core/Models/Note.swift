@@ -36,6 +36,17 @@ public final class Note {
     public var taskDone: [Bool] = []
     /// Optional due date for task-type notes. Optional → migration-safe.
     public var dueDate: Date? = nil
+    /// A scheduleable event detected in the note (e.g. "Anna's birthday 19 Sep 9am").
+    /// Surfaced as an "add to calendar" proposal. All optional → migration-safe.
+    public var eventTitle: String? = nil
+    public var eventDate: Date? = nil
+    /// Whether the detected event includes a specific time (vs. an all-day date).
+    public var eventHasTime: Bool = false
+    /// Identifier of the EKEvent once added, so we don't offer to add it twice.
+    public var calendarEventID: String? = nil
+    /// AI media enrichment (movie info + cached poster). nil → ordinary note.
+    /// Optional → migration-safe. Drives the ✦ marker and the movie hero in detail.
+    public var media: MediaInfo? = nil
     /// On-device semantic embedding of the note's text. Empty until computed.
     /// Powers contextual resurfacing (echo at capture, recall, digest).
     /// Inline default `= []` is required for SwiftData lightweight migration of
@@ -103,4 +114,12 @@ public final class Note {
     public var completedTaskCount: Int {
         tasks.indices.filter { isTaskDone($0) }.count
     }
+
+    /// A detected event is present and has not yet been added to the calendar.
+    public var hasPendingEvent: Bool {
+        eventTitle != nil && eventDate != nil && calendarEventID == nil
+    }
+
+    /// Whether this note carries media enrichment (renders ✦ + movie hero).
+    public var hasMedia: Bool { media != nil }
 }
