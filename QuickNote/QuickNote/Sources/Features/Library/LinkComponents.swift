@@ -95,7 +95,7 @@ struct PlatformPill: View {
     var body: some View {
         if let cfg = config {
             Text(cfg.label)
-                .font(.system(size: 11, weight: .medium))
+                .appFont(11, .medium, relativeTo: .caption2)
                 .tracking(0.3)
                 .textCase(.uppercase)
                 .foregroundStyle(.white)
@@ -175,7 +175,7 @@ struct LinkCard: View {
 
                 if let duration = link.duration {
                     Text(duration)
-                        .font(.system(size: 9.5, weight: .medium))
+                        .appFont(9.5, .medium, relativeTo: .caption2)
                         .monospacedDigit()
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
@@ -192,7 +192,7 @@ struct LinkCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(link.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .appFont(12, .medium, relativeTo: .caption)
                     .tracking(-0.15)
                     .lineLimit(2)
                     .foregroundStyle(AppColors.primaryText)
@@ -200,17 +200,17 @@ struct LinkCard: View {
                 // Fix 4: secondary card text at #6B7280 minimum for accessibility
                 HStack(spacing: 5) {
                     Text(link.author ?? link.host)
-                        .font(.system(size: 10.5, weight: .light))
+                        .appFont(10.5, .light, relativeTo: .caption2)
                         .tracking(-0.05)
                         .foregroundStyle(Color(hex: "6B7280"))
                         .lineLimit(1)
 
                     if let readTime = link.readTime {
                         Text("·")
-                            .font(.system(size: 10.5, weight: .light))
+                            .appFont(10.5, .light, relativeTo: .caption2)
                             .foregroundStyle(Color(hex: "6B7280"))
                         Text(readTime)
-                            .font(.system(size: 10.5, weight: .light))
+                            .appFont(10.5, .light, relativeTo: .caption2)
                             .foregroundStyle(Color(hex: "6B7280"))
                     }
                 }

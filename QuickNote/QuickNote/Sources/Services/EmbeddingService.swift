@@ -55,6 +55,15 @@ public final class EmbeddingService {
         NLEmbedding.sentenceEmbedding(for: Self.fallback) != nil
     }
 
+    /// Recomputes and stores a note's embedding after its text changes (edit /
+    /// develop). Without this, edited notes keep stale vectors.
+    @MainActor
+    public func reembed(_ note: Note) {
+        let result = embed(note.embeddingInput)
+        note.embedding = result.vector
+        note.langCode = result.language
+    }
+
     /// Embeds `text` in its detected language. Returns the vector and the language
     /// code actually used (so vectors are only ever compared within one space).
     public func embed(_ text: String) -> (vector: [Double], language: String) {

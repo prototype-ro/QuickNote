@@ -28,7 +28,7 @@ struct ProcessingOverlay: View {
             VStack(spacing: 32) {
                 if !capturedText.isEmpty {
                     Text(capturedText)
-                        .font(.system(size: 17, weight: .light))
+                        .appFont(17, .light, relativeTo: .body)
                         .italic()
                         .tracking(-0.2)
                         .multilineTextAlignment(.center)
@@ -43,7 +43,7 @@ struct ProcessingOverlay: View {
                     HeroMark(size: 52, haloColor: AppColors.accentBlue, breathe: true)
 
                     Text(processingLabel)
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .italic()
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.secondaryText)
@@ -82,7 +82,7 @@ struct LibraryToast: View {
                 }
 
                 Text("saved to library")
-                    .font(.system(size: 13, weight: .regular))
+                    .appFont(13, .regular, relativeTo: .subheadline)
                     .tracking(-0.1)
                     .foregroundStyle(AppColors.primaryText)
             }
@@ -94,10 +94,10 @@ struct LibraryToast: View {
             } label: {
                 HStack(spacing: 4) {
                     Text("peek")
-                        .font(.system(size: 12, weight: .medium))
+                        .appFont(12, .medium, relativeTo: .caption)
                         .tracking(-0.05)
                     Image(systemName: "arrow.right")
-                        .font(.system(size: 10, weight: .medium))
+                        .appFont(10, .medium, relativeTo: .caption2)
                 }
                 .foregroundStyle(AppColors.primaryText)
             }
@@ -166,7 +166,7 @@ struct DigestCard: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 14) {
                 Text(weekRange)
-                    .font(.system(size: 13, weight: .regular))
+                    .appFont(13, .regular, relativeTo: .subheadline)
                     .tracking(-0.05)
                     .foregroundStyle(AppColors.secondaryText)
 
@@ -178,7 +178,7 @@ struct DigestCard: View {
                 }
 
                 Text(weeklyQuote)
-                    .font(.system(size: 13, weight: .light))
+                    .appFont(13, .light, relativeTo: .subheadline)
                     .italic()
                     .tracking(-0.05)
                     .foregroundStyle(AppColors.tertiaryText)
@@ -199,11 +199,11 @@ struct DigestCard: View {
     private func statCell(value: Int, label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(value)")
-                .font(.system(size: 22, weight: .semibold))
+                .appFont(22, .semibold, relativeTo: .title2)
                 .tracking(-0.5)
                 .foregroundStyle(AppColors.primaryText)
             Text(label)
-                .font(.system(size: 11, weight: .light))
+                .appFont(11, .light, relativeTo: .caption2)
                 .tracking(-0.05)
                 .foregroundStyle(AppColors.secondaryText)
         }
@@ -289,12 +289,12 @@ struct DigestDetailSheet: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("this week")
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .italic()
                         .foregroundStyle(AppColors.tertiaryText)
 
                     Text("your week in review.")
-                        .font(.system(size: 22, weight: .bold))
+                        .appFont(22, .bold, relativeTo: .title2)
                         .tracking(-0.5)
                         .foregroundStyle(AppColors.primaryText)
                 }
@@ -304,11 +304,11 @@ struct DigestDetailSheet: View {
                     ForEach(last7Days, id: \.date) { item in
                         HStack {
                             Text(item.dayName)
-                                .font(.system(size: 15, weight: .light))
+                                .appFont(15, .light, relativeTo: .body)
                                 .foregroundStyle(AppColors.primaryText)
                             Spacer()
                             Text("\(item.count)")
-                                .font(.system(size: 17, weight: .semibold))
+                                .appFont(17, .semibold, relativeTo: .headline)
                                 .foregroundStyle(AppColors.primaryText)
                         }
                         .padding(.vertical, 12)
@@ -349,14 +349,14 @@ struct DigestDetailSheet: View {
             Divider().opacity(0.12).padding(.vertical, 4)
 
             Text("you wrote this. still true?")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .italic()
                 .tracking(-0.05)
                 .foregroundStyle(AppColors.tertiaryText)
 
             Button { onOpenNote(note) } label: {
                 Text(note.embeddingSource)
-                    .font(.system(size: 14, weight: .light))
+                    .appFont(14, .light, relativeTo: .subheadline)
                     .italic()
                     .tracking(-0.1)
                     .lineSpacing(4)
@@ -423,12 +423,12 @@ struct MindEmptyState: View {
                 .padding(.bottom, 14)
 
             Text(variant.heading)
-                .font(.system(size: 19, weight: .bold))
+                .appFont(19, .bold, relativeTo: .title3)
                 .tracking(-0.4)
                 .foregroundStyle(AppColors.primaryText)
 
             Text(variant.subtext)
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .tracking(-0.1)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(AppColors.secondaryText)

@@ -40,12 +40,12 @@ struct EchoThread: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("you wrote, \(relativeTime)")
-                        .font(.system(size: 10.5, weight: .light))
+                        .appFont(10.5, .light, relativeTo: .caption2)
                         .tracking(0.1)
                         .foregroundStyle(AppColors.tertiaryText.opacity(0.8))
 
                     Text(note.embeddingSource)
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .italic()
                         .tracking(-0.1)
                         .lineSpacing(3)

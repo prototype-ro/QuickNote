@@ -23,6 +23,7 @@ struct NoteDetailSheet: View {
     @State private var sparkPulse = false
     @State private var isEditing = false
     @State private var editDraft = ""
+    @State private var showDevelop = false
     @State private var showRevertConfirm = false
     @State private var sheetDragOffset: CGFloat = 0
     // Fix 8: flag to suppress animation during active drag
@@ -46,6 +47,9 @@ struct NoteDetailSheet: View {
                 .transition(.move(edge: .bottom))
         }
         .ignoresSafeArea()
+        .fullScreenCover(isPresented: $showDevelop) {
+            DevelopEditorView(note: note) { showDevelop = false }
+        }
         .confirmationDialog("Revert to original?", isPresented: $showRevertConfirm, titleVisibility: .visible) {
             Button("Revert", role: .destructive) {
                 note.displayText = nil
@@ -198,14 +202,14 @@ struct NoteDetailSheet: View {
 
             Spacer()
             Text("captured · \(relativeTime)")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .foregroundStyle(AppColors.tertiaryText)
         }
     }
 
     private var subtitleText: some View {
         Text("from \(dayDescription).")
-            .font(.system(size: 13, weight: .light))
+            .appFont(13, .light, relativeTo: .subheadline)
             .italic()
             .foregroundStyle(AppColors.tertiaryText)
     }
@@ -235,7 +239,10 @@ struct NoteDetailSheet: View {
                             Spacer()
                             Button("Done") {
                                 let trimmed = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmed.isEmpty { note.displayText = trimmed }
+                                if !trimmed.isEmpty {
+                                    note.displayText = trimmed
+                                    EmbeddingService.shared.reembed(note)
+                                }
                                 withAnimation(AppAnimation.springSnappy) { isEditing = false }
                             }
                         }
@@ -255,7 +262,10 @@ struct NoteDetailSheet: View {
                 Button {
                     if isEditing {
                         let trimmed = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !trimmed.isEmpty { note.displayText = trimmed }
+                        if !trimmed.isEmpty {
+                            note.displayText = trimmed
+                            EmbeddingService.shared.reembed(note)
+                        }
                         withAnimation(AppAnimation.springSnappy) { isEditing = false }
                     } else {
                         editDraft = note.displayText ?? note.rawText
@@ -270,7 +280,21 @@ struct NoteDetailSheet: View {
                                 Circle().stroke(AppColors.ink.opacity(0.12), lineWidth: 0.5)
                             )
                         Image(systemName: isEditing ? "checkmark" : "pencil")
-                            .font(.system(size: 12, weight: .medium))
+                            .appFont(12, .medium, relativeTo: .caption)
+                            .foregroundStyle(Color(hex: "3C3C3E"))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                // Develop — open the focused full-screen editor for long-form
+                Button { showDevelop = true } label: {
+                    ZStack {
+                        Circle()
+                            .fill(AppColors.ink.opacity(0.10))
+                            .frame(width: 28, height: 28)
+                            .overlay(Circle().stroke(AppColors.ink.opacity(0.12), lineWidth: 0.5))
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .appFont(11, .medium, relativeTo: .caption2)
                             .foregroundStyle(Color(hex: "3C3C3E"))
                     }
                 }
@@ -292,7 +316,7 @@ struct NoteDetailSheet: View {
                                 )
                             )
                         Text("✦")
-                            .font(.system(size: 12, weight: .medium))
+                            .appFont(12, .medium, relativeTo: .caption)
                             .foregroundStyle(showEnhancer ? AppColors.onAccent : Color(hex: "3C3C3E"))
                     }
                 }
@@ -313,7 +337,7 @@ struct NoteDetailSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             // Fix 7: 14pt gap between section label and content
             Text("ACTION ITEMS")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
                 .padding(.bottom, 14)
@@ -342,7 +366,7 @@ struct NoteDetailSheet: View {
             .animation(.easeInOut(duration: 0.2), value: checked)
 
             Text(text)
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .tracking(-0.1)
                 .foregroundStyle(checked ? AppColors.secondaryText : AppColors.primaryText)
                 .strikethrough(checked, color: AppColors.secondaryText)
@@ -363,7 +387,7 @@ struct NoteDetailSheet: View {
         let isOverdue = note.dueDate.map { $0 < Date() } ?? false
         HStack(spacing: 8) {
             Image(systemName: "calendar")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .foregroundStyle(isOverdue ? AppColors.destructive : AppColors.tertiaryText)
 
             if note.dueDate == nil {
@@ -371,7 +395,7 @@ struct NoteDetailSheet: View {
                     note.dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
                 } label: {
                     Text("add due date")
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.secondaryText)
                 }
                 .buttonStyle(.plain)
@@ -382,11 +406,11 @@ struct NoteDetailSheet: View {
                     displayedComponents: [.date, .hourAndMinute]
                 )
                 .labelsHidden()
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
 
                 if isOverdue {
                     Text("overdue")
-                        .font(.system(size: 11, weight: .medium))
+                        .appFont(11, .medium, relativeTo: .caption2)
                         .foregroundStyle(AppColors.destructive)
                 }
 
@@ -407,7 +431,7 @@ struct NoteDetailSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("TAGS")
-                    .font(.system(size: 10.5, weight: .medium))
+                    .appFont(10.5, .medium, relativeTo: .caption2)
                     .tracking(1.4)
                     .foregroundStyle(AppColors.tertiaryText)
 
@@ -415,7 +439,7 @@ struct NoteDetailSheet: View {
                     withAnimation(AppAnimation.springFluid) { showAddTagField.toggle() }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .medium))
+                        .appFont(10, .medium, relativeTo: .caption2)
                         .foregroundStyle(AppColors.tertiaryText)
                         .frame(width: 18, height: 18)
                         .background(AppColors.ink.opacity(0.05))
@@ -438,7 +462,7 @@ struct NoteDetailSheet: View {
             if showAddTagField {
                 HStack(spacing: 6) {
                     TextField("new tag", text: $newTagText)
-                        .font(.system(size: 12, weight: .regular))
+                        .appFont(12, .regular, relativeTo: .caption)
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.primaryText)
                         .autocorrectionDisabled()
@@ -447,7 +471,7 @@ struct NoteDetailSheet: View {
 
                     Button(action: commitNewTag) {
                         Image(systemName: "return")
-                            .font(.system(size: 11, weight: .medium))
+                            .appFont(11, .medium, relativeTo: .caption2)
                             .foregroundStyle(AppColors.secondaryText)
                     }
                     .buttonStyle(.plain)
@@ -465,7 +489,7 @@ struct NoteDetailSheet: View {
     private func tagPill(_ tag: String) -> some View {
         HStack(spacing: 4) {
             Text(tag)
-                .font(.system(size: 12, weight: .regular))
+                .appFont(12, .regular, relativeTo: .caption)
                 .tracking(-0.1)
                 .foregroundStyle(AppColors.secondaryText)
 
@@ -505,13 +529,13 @@ struct NoteDetailSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             // Fix 7: 14pt gap between section label and content
             Text("SUMMARY")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
                 .padding(.bottom, 14)
 
             Text(note.summary)
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .italic()
                 .tracking(-0.1)
                 .lineSpacing(6)
@@ -529,9 +553,9 @@ struct NoteDetailSheet: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 12, weight: .light))
+                        .appFont(12, .light, relativeTo: .caption)
                     Text("revert to original")
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                 }
                 .foregroundStyle(AppColors.secondaryText)
             }
@@ -544,7 +568,7 @@ struct NoteDetailSheet: View {
     private var seeAlsoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("SEE ALSO")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
 
@@ -559,7 +583,7 @@ struct NoteDetailSheet: View {
                             CatIcon(kind: related.type, size: 11, color: AppColors.tertiaryText)
 
                             Text(related.displayText ?? related.rawText)
-                                .font(.system(size: 13, weight: .light))
+                                .appFont(13, .light, relativeTo: .subheadline)
                                 .tracking(-0.1)
                                 .foregroundStyle(AppColors.primaryText)
                                 .lineLimit(1)
@@ -568,7 +592,7 @@ struct NoteDetailSheet: View {
                             Spacer()
 
                             Text(relativeTimeFor(related.createdAt))
-                                .font(.system(size: 11, weight: .light))
+                                .appFont(11, .light, relativeTo: .caption2)
                                 .foregroundStyle(AppColors.tertiaryText)
                         }
                         .frame(minHeight: 44)
@@ -599,10 +623,10 @@ struct NoteDetailSheet: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: note.isArchived ? "archivebox.fill" : "archivebox")
-                        .font(.system(size: 12, weight: .light))
+                        .appFont(12, .light, relativeTo: .caption)
                     Text(note.isArchived ? "unarchive" : "archive note")
                 }
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .foregroundStyle(AppColors.secondaryText)
             }
             .buttonStyle(.plain)
@@ -611,7 +635,7 @@ struct NoteDetailSheet: View {
 
             Button { showDeleteAlert = true } label: {
                 Text("delete note")
-                    .font(.system(size: 13, weight: .light))
+                    .appFont(13, .light, relativeTo: .subheadline)
                     .foregroundStyle(AppColors.destructive)
             }
             .buttonStyle(.plain)

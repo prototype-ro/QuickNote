@@ -76,14 +76,14 @@ struct LinkDetailPeek: View {
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("TITLE")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
                 .padding(.bottom, 6)
 
             if editingTitle {
                 TextField("title", text: $titleDraft, axis: .vertical)
-                    .font(.system(size: 17, weight: .semibold))
+                    .appFont(17, .semibold, relativeTo: .headline)
                     .tracking(-0.3)
                     .foregroundStyle(AppColors.primaryText)
                     .onSubmit { commitTitle() }
@@ -95,7 +95,7 @@ struct LinkDetailPeek: View {
                     }
             } else {
                 Text(link.title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .appFont(17, .semibold, relativeTo: .headline)
                     .tracking(-0.3)
                     .foregroundStyle(AppColors.primaryText)
                     .onTapGesture {
@@ -106,7 +106,7 @@ struct LinkDetailPeek: View {
 
             // Fix 7: 6pt gap between title and "tap to edit" hint
             Text("tap to edit")
-                .font(.system(size: 11, weight: .light))
+                .appFont(11, .light, relativeTo: .caption2)
                 .foregroundStyle(AppColors.tertiaryText)
                 .opacity(editingTitle ? 0 : 0.7)
                 .padding(.top, 6)
@@ -124,7 +124,7 @@ struct LinkDetailPeek: View {
     private var urlSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("URL")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
 
@@ -134,7 +134,7 @@ struct LinkDetailPeek: View {
                 }
             } label: {
                 Text(link.urlString)
-                    .font(.system(size: 12, weight: .light))
+                    .appFont(12, .light, relativeTo: .caption)
                     .tracking(-0.1)
                     .foregroundStyle(Color(hex: "6B7280"))
                     .underline()
@@ -151,7 +151,7 @@ struct LinkDetailPeek: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("TAGS")
-                    .font(.system(size: 10.5, weight: .medium))
+                    .appFont(10.5, .medium, relativeTo: .caption2)
                     .tracking(1.4)
                     .foregroundStyle(AppColors.tertiaryText)
 
@@ -159,7 +159,7 @@ struct LinkDetailPeek: View {
                     withAnimation(AppAnimation.springFluid) { showAddTagField.toggle() }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .medium))
+                        .appFont(10, .medium, relativeTo: .caption2)
                         .foregroundStyle(AppColors.tertiaryText)
                         .frame(width: 18, height: 18)
                         .background(AppColors.ink.opacity(0.05))
@@ -179,7 +179,7 @@ struct LinkDetailPeek: View {
             if showAddTagField {
                 HStack(spacing: 6) {
                     TextField("new tag", text: $newTagText)
-                        .font(.system(size: 12, weight: .regular))
+                        .appFont(12, .regular, relativeTo: .caption)
                         .foregroundStyle(AppColors.primaryText)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -187,7 +187,7 @@ struct LinkDetailPeek: View {
 
                     Button(action: commitTag) {
                         Image(systemName: "return")
-                            .font(.system(size: 11, weight: .medium))
+                            .appFont(11, .medium, relativeTo: .caption2)
                             .foregroundStyle(AppColors.secondaryText)
                     }
                     .buttonStyle(.plain)
@@ -205,7 +205,7 @@ struct LinkDetailPeek: View {
     private func tagPill(_ tag: String) -> some View {
         HStack(spacing: 4) {
             Text(tag)
-                .font(.system(size: 12, weight: .regular))
+                .appFont(12, .regular, relativeTo: .caption)
                 .tracking(-0.1)
                 .foregroundStyle(AppColors.secondaryText)
             Button {
@@ -239,14 +239,14 @@ struct LinkDetailPeek: View {
     private var noteSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("MY NOTE")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(1.4)
                 .foregroundStyle(AppColors.tertiaryText)
 
             ZStack(alignment: .topLeading) {
                 if link.userNote == nil || link.userNote!.isEmpty {
                     Text("add a note about this link…")
-                        .font(.system(size: 14, weight: .light))
+                        .appFont(14, .light, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.tertiaryText)
                         .padding(.top, 8).padding(.leading, 4)
                         .allowsHitTesting(false)
@@ -256,7 +256,7 @@ struct LinkDetailPeek: View {
                     get: { link.userNote ?? "" },
                     set: { link.userNote = $0.isEmpty ? nil : $0 }
                 ))
-                .font(.system(size: 14, weight: .light))
+                .appFont(14, .light, relativeTo: .subheadline)
                 .tracking(-0.1)
                 .foregroundStyle(AppColors.primaryText)
                 .scrollContentBackground(.hidden)
@@ -291,10 +291,10 @@ struct LinkDetailPeek: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: link.isArchived ? "archivebox.fill" : "archivebox")
-                        .font(.system(size: 12, weight: .light))
+                        .appFont(12, .light, relativeTo: .caption)
                     Text(link.isArchived ? "unarchive" : "archive")
                 }
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .foregroundStyle(AppColors.secondaryText)
             }
             .buttonStyle(.plain)
@@ -303,7 +303,7 @@ struct LinkDetailPeek: View {
 
             Button { showDeleteAlert = true } label: {
                 Text("delete")
-                    .font(.system(size: 13, weight: .light))
+                    .appFont(13, .light, relativeTo: .subheadline)
                     .foregroundStyle(AppColors.destructive)
             }
             .buttonStyle(.plain)

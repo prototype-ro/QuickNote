@@ -76,11 +76,11 @@ struct RecallView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("recall")
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .italic()
                 .foregroundStyle(AppColors.tertiaryText)
             Text("ask your mind.")
-                .font(.system(size: 24, weight: .bold))
+                .appFont(24, .bold, relativeTo: .title2)
                 .tracking(-0.5)
                 .foregroundStyle(AppColors.primaryText)
         }
@@ -90,7 +90,7 @@ struct RecallView: View {
     private var queryField: some View {
         HStack(spacing: 10) {
             TextField("what did you conclude about…", text: $query, axis: .vertical)
-                .font(.system(size: 16, weight: .light))
+                .appFont(16, .light, relativeTo: .body)
                 .tracking(-0.15)
                 .lineLimit(1...3)
                 .foregroundStyle(AppColors.primaryText)
@@ -126,20 +126,20 @@ struct RecallView: View {
         switch phase {
         case .idle:
             Text("retrieved from your own words. nothing leaves but the matches.")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .italic()
                 .foregroundStyle(AppColors.tertiaryText)
         case .thinking:
             HStack(spacing: 10) {
                 HeroMark(size: 22, haloColor: AppColors.accentBlue, breathe: true)
                 Text("gathering…")
-                    .font(.system(size: 13, weight: .light))
+                    .appFont(13, .light, relativeTo: .subheadline)
                     .italic()
                     .foregroundStyle(AppColors.secondaryText)
             }
         case .empty:
             Text("nothing in here speaks to that — yet.")
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .italic()
                 .foregroundStyle(AppColors.secondaryText)
         case .answered:
@@ -152,7 +152,7 @@ struct RecallView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if !stitch.isEmpty {
                     Text(stitch)
-                        .font(.system(size: 15, weight: .light))
+                        .appFont(15, .light, relativeTo: .body)
                         .tracking(-0.1)
                         .lineSpacing(5)
                         .foregroundStyle(AppColors.secondaryText)
@@ -170,7 +170,7 @@ struct RecallView: View {
         Button { onOpenNote(note) } label: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(note.embeddingSource)
-                    .font(.system(size: 14, weight: .light))
+                    .appFont(14, .light, relativeTo: .subheadline)
                     .tracking(-0.1)
                     .lineSpacing(4)
                     .lineLimit(3)
@@ -178,7 +178,7 @@ struct RecallView: View {
                     .foregroundStyle(AppColors.primaryText.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
                 Text(relativeTime(note.createdAt))
-                    .font(.system(size: 11, weight: .light))
+                    .appFont(11, .light, relativeTo: .caption2)
                     .foregroundStyle(AppColors.tertiaryText)
             }
             .padding(.horizontal, 14)

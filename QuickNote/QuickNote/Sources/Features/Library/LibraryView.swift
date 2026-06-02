@@ -100,7 +100,7 @@ struct LibraryView: View {
                 HStack(spacing: 8) {
                     MarkGlyph(size: 14, strokeWidth: 1.4)
                     Text("mind")
-                        .font(.system(size: 13, weight: .regular))
+                        .appFont(13, .regular, relativeTo: .subheadline)
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.primaryText)
                 }
@@ -112,7 +112,7 @@ struct LibraryView: View {
                 .overlay(Capsule().stroke(AppColors.ink.opacity(0.04), lineWidth: 0.5))
                 .overlay(alignment: .topTrailing) {
                     Text("\(activeNotes.count)")
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .appFont(10.5, .semibold, relativeTo: .caption2)
                         .monospacedDigit()
                         .foregroundStyle(AppColors.primaryText)
                         .padding(.horizontal, 5)
@@ -135,7 +135,7 @@ struct LibraryView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .semibold))
                     Text("add link")
-                        .font(.system(size: 13, weight: .regular))
+                        .appFont(13, .regular, relativeTo: .subheadline)
                         .tracking(-0.1)
                 }
                 .foregroundStyle(AppColors.primaryText)
@@ -157,18 +157,18 @@ struct LibraryView: View {
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("quieter shelf.")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .tracking(-0.05)
                 .foregroundStyle(AppColors.tertiaryText)
 
             HStack(alignment: .firstTextBaseline) {
                 Text("library")
-                    .font(.system(size: 34, weight: .heavy))
+                    .appFont(34, .heavy, relativeTo: .largeTitle)
                     .tracking(-1)
                     .foregroundStyle(AppColors.primaryText)
 
                 Text(" · \(totalLinkCount) saved")
-                    .font(.system(size: 12, weight: .light))
+                    .appFont(12, .light, relativeTo: .caption)
                     .tracking(-0.1)
                     .foregroundStyle(AppColors.tertiaryText)
             }
@@ -199,7 +199,7 @@ struct LibraryView: View {
             withAnimation(AppAnimation.springSnappy) { appState.libraryFilter = type }
         } label: {
             Text(type.label)
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(0.3)
                 .textCase(.uppercase)
                 .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
@@ -224,7 +224,7 @@ struct LibraryView: View {
             showSortSheet = true
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 13, weight: .regular))
+                .appFont(13, .regular, relativeTo: .subheadline)
                 .foregroundStyle(appState.librarySortOrder == .newest
                                  ? AppColors.secondaryText
                                  : AppColors.primaryText)
@@ -277,7 +277,7 @@ struct LibraryView: View {
     private func tagChip(_ label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text("#\(label)")
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(0.2)
                 .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
                 .padding(.horizontal, 10)
@@ -323,11 +323,11 @@ struct LibraryView: View {
         VStack(spacing: 8) {
             Spacer()
             Text("nothing saved yet.")
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .tracking(-0.1)
                 .foregroundStyle(AppColors.tertiaryText)
             Text("paste a URL in the capture bar to save a link.")
-                .font(.system(size: 12, weight: .light))
+                .appFont(12, .light, relativeTo: .caption)
                 .tracking(-0.05)
                 .foregroundStyle(AppColors.tertiaryText.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -358,14 +358,14 @@ struct LibraryView: View {
                 .padding(.bottom, 20)
 
                 Text("add link")
-                    .font(.system(size: 22, weight: .bold))
+                    .appFont(22, .bold, relativeTo: .title2)
                     .tracking(-0.5)
                     .foregroundStyle(AppColors.primaryText)
                     .padding(.bottom, 20)
 
                 HStack(spacing: 10) {
                     TextField("paste or type a URL", text: $pendingURL)
-                        .font(.system(size: 14, weight: .regular))
+                        .appFont(14, .regular, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.primaryText)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -405,7 +405,7 @@ struct LibraryView: View {
                         withAnimation(AppAnimation.springFluid) { showAddLink = false }
                     } label: {
                         Text("cancel")
-                            .font(.system(size: 15, weight: .regular))
+                            .appFont(15, .regular, relativeTo: .body)
                             .foregroundStyle(AppColors.secondaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
@@ -416,7 +416,7 @@ struct LibraryView: View {
 
                     Button(action: commitLink) {
                         Text("save")
-                            .font(.system(size: 15, weight: .semibold))
+                            .appFont(15, .semibold, relativeTo: .body)
                             .foregroundStyle(AppColors.onAccent)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
@@ -572,9 +572,9 @@ private struct SwipeableLinkCard: View {
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "archivebox")
-                                .font(.system(size: 13, weight: .light))
+                                .appFont(13, .light, relativeTo: .subheadline)
                             Text("ARCHIVE")
-                                .font(.system(size: 9, weight: .medium))
+                                .appFont(9, .medium, relativeTo: .caption2)
                                 .tracking(0.3)
                         }
                         .foregroundStyle(AppColors.secondaryText)
@@ -595,9 +595,9 @@ private struct SwipeableLinkCard: View {
                     Button { showDeleteAlert = true } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "trash")
-                                .font(.system(size: 13, weight: .light))
+                                .appFont(13, .light, relativeTo: .subheadline)
                             Text("DELETE")
-                                .font(.system(size: 9, weight: .medium))
+                                .appFont(9, .medium, relativeTo: .caption2)
                                 .tracking(0.3)
                         }
                         .foregroundStyle(.white)

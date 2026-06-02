@@ -29,7 +29,7 @@ struct AIEnhancerInline: View {
                 resultView(enhanced)
             } else if let err = errorMessage {
                 Text(err)
-                    .font(.system(size: 12.5, weight: .light))
+                    .appFont(12.5, .light, relativeTo: .caption)
                     .foregroundStyle(AppColors.tertiaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
@@ -61,7 +61,7 @@ struct AIEnhancerInline: View {
             runEnhancement(mode)
         } label: {
             Text(mode.label)
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(0.3)
                 .textCase(.uppercase)
                 .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
@@ -81,7 +81,7 @@ struct AIEnhancerInline: View {
 
     private var enhancingIndicator: some View {
         Text("enhancing…")
-            .font(.system(size: 13, weight: .light))
+            .appFont(13, .light, relativeTo: .subheadline)
             .italic()
             .foregroundStyle(AppColors.tertiaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -90,7 +90,7 @@ struct AIEnhancerInline: View {
     private func resultView(_ enhanced: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(enhanced)
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .tracking(-0.15)
                 .lineSpacing(4)
                 .foregroundStyle(AppColors.primaryText)
@@ -104,7 +104,7 @@ struct AIEnhancerInline: View {
                     onDismiss()
                 } label: {
                     Text("keep")
-                        .font(.system(size: 13, weight: .medium))
+                        .appFont(13, .medium, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.onAccent)
                         .padding(.horizontal, 14)
                         .frame(height: 32)
@@ -121,7 +121,7 @@ struct AIEnhancerInline: View {
                     onDismiss()
                 } label: {
                     Text("revert")
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.secondaryText)
                 }
                 .buttonStyle(.plain)
@@ -185,12 +185,12 @@ struct ProUpgradeSheet: View {
 
                 VStack(spacing: 6) {
                     Text("Quicknote Pro")
-                        .font(.system(size: 22, weight: .bold))
+                        .appFont(22, .bold, relativeTo: .title2)
                         .tracking(-0.5)
                         .foregroundStyle(AppColors.primaryText)
 
                     Text("AI enhancement, unlimited captures, priority processing")
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(AppColors.secondaryText)
                         .frame(maxWidth: 240)
@@ -203,7 +203,7 @@ struct ProUpgradeSheet: View {
                     }
 
                     Button("maybe later") { dismiss() }
-                        .font(.system(size: 13, weight: .light))
+                        .appFont(13, .light, relativeTo: .subheadline)
                         .foregroundStyle(AppColors.tertiaryText)
                         .buttonStyle(.plain)
                 }

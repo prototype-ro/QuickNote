@@ -71,8 +71,20 @@ public final class Note {
         self.embedding = embedding
     }
 
-    /// Text used for semantic embedding — the enhanced text if present, else raw.
+    /// Full text for DISPLAY — the enhanced/edited text if present, else raw.
     public var embeddingSource: String { displayText ?? rawText }
+
+    /// Text fed to the EMBEDDING model. For long ("developed") notes the full
+    /// document makes a weak sentence vector, so we embed the summary (or the
+    /// head) instead — keeping echo/recall coherent. Short notes embed as-is.
+    public var embeddingInput: String {
+        let text = displayText ?? rawText
+        guard text.count > 400 else { return text }
+        return summary.isEmpty ? String(text.prefix(400)) : summary
+    }
+
+    /// Whether this note has grown into long-form ("developed") content.
+    public var isLongForm: Bool { (displayText ?? rawText).count > 280 }
 
     /// Whether the task at `index` is complete (safe for migrated notes whose
     /// `taskDone` array is empty or shorter than `tasks`).

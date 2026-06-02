@@ -124,16 +124,17 @@ struct NoteBadge: View {
         HStack(spacing: 5) {
             CatIcon(kind: kind, size: 11)
             Text(kind.rawValue)
-                .font(.system(size: 10.5, weight: .medium))
+                .appFont(10.5, .medium, relativeTo: .caption2)
                 .tracking(0.8)
                 .textCase(.uppercase)
         }
         .foregroundStyle(AppColors.primaryText)
         .padding(.horizontal, 9)
-        .frame(height: 22)
+        .frame(minHeight: 22)
         .background(AppColors.ink.opacity(0.04))
         .clipShape(Capsule())
         .overlay(Capsule().stroke(AppColors.ink.opacity(0.07), lineWidth: 0.5))
+        .accessibilityLabel("\(kind.rawValue) type")
         .scaleEffect(appeared ? 1.0 : (animate ? 0.65 : 1.0))
         .opacity(appeared ? 1.0 : (animate ? 0.0 : 1.0))
         .onAppear {
@@ -198,15 +199,7 @@ struct NoteCard: View {
         return ""
     }
 
-    private var typeWarmthColor: Color {
-        switch note.type {
-        case .task:  return Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.06)
-        case .idea:  return Color(red: 0.72, green: 0.55, blue: 1.0).opacity(0.06)
-        case .note:  return .clear
-        case .link:  return Color(red: 0.47, green: 0.67, blue: 1.0).opacity(0.05)
-        case .digest: return .clear
-        }
-    }
+    private var typeWarmthColor: Color { CategoryTint.wash(note.type) }
 
     var body: some View {
         ZStack {
@@ -219,9 +212,9 @@ struct NoteCard: View {
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "archivebox")
-                                .font(.system(size: 15, weight: .light))
+                                .appFont(15, .light, relativeTo: .body)
                             Text("ARCHIVE")
-                                .font(.system(size: 10, weight: .medium))
+                                .appFont(10, .medium, relativeTo: .caption2)
                                 .tracking(0.3)
                         }
                         .foregroundStyle(AppColors.secondaryText)
@@ -241,9 +234,9 @@ struct NoteCard: View {
                     Button { showDeleteAlert = true } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "trash")
-                                .font(.system(size: 15, weight: .light))
+                                .appFont(15, .light, relativeTo: .body)
                             Text("DELETE")
-                                .font(.system(size: 10, weight: .medium))
+                                .appFont(10, .medium, relativeTo: .caption2)
                                 .tracking(0.3)
                         }
                         .foregroundStyle(.white)
@@ -265,7 +258,7 @@ struct NoteCard: View {
             } label: {
                 cardFace
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressStyle(scale: 0.985))
             .offset(x: dragOffset)
             .simultaneousGesture(cardDragGesture)
 
@@ -304,12 +297,12 @@ struct NoteCard: View {
                 Spacer()
                 HStack(spacing: 6) {
                     Text(relativeTime)
-                        .font(.system(size: 12, weight: .light))
+                        .appFont(12, .light, relativeTo: .caption)
                         .tracking(-0.1)
-                        .foregroundStyle(Color(hex: "6B7280"))
+                        .foregroundStyle(AppColors.secondaryText)
                     if repeatCount >= 3 {
                         Circle()
-                            .fill(Color(hex: "6B7280"))
+                            .fill(AppColors.secondaryText)
                             .frame(width: 6, height: 6)
                             .contextMenu {
                                 Text("you've noted this \(repeatCount) times")
@@ -319,15 +312,27 @@ struct NoteCard: View {
             }
 
             Text(note.displayText ?? note.rawText)
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .tracking(-0.15)
                 .lineSpacing(6)
                 .foregroundStyle(AppColors.primaryText)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(note.isLongForm ? 6 : nil)
+                .fixedSize(horizontal: false, vertical: note.isLongForm ? false : true)
+
+            if note.isLongForm {
+                HStack(spacing: 4) {
+                    Image(systemName: "text.alignleft")
+                        .appFont(9, .regular, relativeTo: .caption2)
+                    Text("developed · tap to read")
+                        .appFont(11, .light, relativeTo: .caption2)
+                        .tracking(-0.05)
+                }
+                .foregroundStyle(AppColors.tertiaryText)
+            }
 
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.system(size: 12.5, weight: .light))
+                    .appFont(12.5, .light, relativeTo: .caption)
                     .tracking(-0.1)
                     .foregroundStyle(AppColors.secondaryText)
             }
@@ -357,6 +362,9 @@ struct NoteCard: View {
                     )
             }
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(note.type.rawValue). \(note.displayText ?? note.rawText)")
+        .accessibilityHint("double tap to open")
     }
 
     // Single gesture handles both horizontal swipe (archive/delete) and vertical flick (type cycle)
@@ -456,7 +464,7 @@ struct FilterChips: View {
             withAnimation(AppAnimation.springSnappy) { selected = type }
         } label: {
             Text(type.label)
-                .font(.system(size: 11, weight: .medium))
+                .appFont(11, .medium, relativeTo: .caption2)
                 .tracking(0.3)
                 .textCase(.uppercase)
                 .foregroundStyle(isActive ? AppColors.onAccent : AppColors.secondaryText)
@@ -474,7 +482,9 @@ struct FilterChips: View {
                     Capsule().stroke(AppColors.ink.opacity(isActive ? 0 : 0.04), lineWidth: 0.5)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
+        .accessibilityLabel(type.label)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 
@@ -529,7 +539,7 @@ struct CaptureBarView: View {
                 ZStack(alignment: .leading) {
                     if text.isEmpty {
                         Text(savingToLibrary ? "saving to library..." : placeholder)
-                            .font(.system(size: 15, weight: .light))
+                            .appFont(15, .light, relativeTo: .body)
                             .tracking(-0.15)
                             .foregroundStyle(stressMode && !savingToLibrary
                                 ? AppColors.secondaryText
@@ -540,7 +550,7 @@ struct CaptureBarView: View {
                     }
 
                     TextField("", text: $text, axis: .vertical)
-                        .font(.system(size: 15, weight: .light))
+                        .appFont(15, .light, relativeTo: .body)
                         .tracking(-0.15)
                         .lineLimit(1...4)
                         .foregroundStyle(AppColors.primaryText)
@@ -566,6 +576,8 @@ struct CaptureBarView: View {
                         .scaleEffect(submitScale)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("capture")
+                    .accessibilityHint("saves your thought")
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                     .animation(.spring(response: 0.22, dampingFraction: 0.7), value: text.isEmpty)
                 }
@@ -573,33 +585,34 @@ struct CaptureBarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(minHeight: 52)
-            .background(
-                ZStack {
-                    Rectangle().fill(.ultraThinMaterial)
-                    if stressMode {
-                        LinearGradient(
-                            colors: [Color(red: 0.47, green: 0.67, blue: 1.0).opacity(0.06), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    }
+            // Liquid Glass — the capture bar is floating chrome above content,
+            // the one place glass belongs (HIG). Gated + Reduce-Transparency fallback.
+            .glassChrome(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                if stressMode {
+                    LinearGradient(
+                        colors: [Color(red: 0.47, green: 0.67, blue: 1.0).opacity(0.06), .clear],
+                        startPoint: .leading, endPoint: .trailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .allowsHitTesting(false)
                 }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(
                         voiceManager?.isRecording == true
                             ? AppColors.ink.opacity(recordingPulse ? 0.55 : 0.22)
-                            : Color.white.opacity(0.6),
-                        lineWidth: voiceManager?.isRecording == true ? 1.5 : 0.5
+                            : Color.clear,
+                        lineWidth: voiceManager?.isRecording == true ? 1.5 : 0
                     )
                     .animation(AppAnimation.springGentle, value: recordingPulse)
             )
+            .shadow(color: .black.opacity(0.10), radius: 14, y: 4)
 
             if urlDetected && !text.isEmpty {
                 Text("saving to library")
-                    .font(.system(size: 11, weight: .light))
+                    .appFont(11, .light, relativeTo: .caption2)
                     .tracking(-0.05)
                     .foregroundStyle(AppColors.tertiaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -609,7 +622,7 @@ struct CaptureBarView: View {
 
             if let err = voiceManager?.errorMessage {
                 Text(err)
-                    .font(.system(size: 12, weight: .light))
+                    .appFont(12, .light, relativeTo: .caption)
                     .tracking(-0.1)
                     .foregroundStyle(AppColors.tertiaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -218,7 +218,7 @@ struct MindView: View {
                     toggleQuietHours()
                 } label: {
                     Text("return")
-                        .font(.system(size: 13, weight: .regular))
+                        .appFont(13, .regular, relativeTo: .subheadline)
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.secondaryText)
                         .padding(.horizontal, 12)
@@ -235,7 +235,7 @@ struct MindView: View {
             Spacer()
 
             Text("quiet hours")
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .italic()
                 .foregroundStyle(AppColors.tertiaryText)
 
@@ -255,7 +255,7 @@ struct MindView: View {
                 showSortSheet = true
             } label: {
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 13, weight: .regular))
+                    .appFont(13, .regular, relativeTo: .subheadline)
                     .foregroundStyle(appState.mindSortOrder == .newest
                                      ? AppColors.secondaryText
                                      : AppColors.primaryText)
@@ -295,7 +295,7 @@ struct MindView: View {
             if appState.isSearching { searchFocused = true }
         } label: {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .regular))
+                .appFont(13, .regular, relativeTo: .subheadline)
                 .foregroundStyle(appState.isSearching ? AppColors.primaryText : AppColors.secondaryText)
                 .frame(width: 36, height: 36)
                 .background(appState.isSearching
@@ -311,13 +311,13 @@ struct MindView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .foregroundStyle(AppColors.tertiaryText)
             TextField("search your thoughts…", text: Binding(
                 get: { appState.mindSearchText },
                 set: { appState.mindSearchText = $0 }
             ))
-            .font(.system(size: 15, weight: .light))
+            .appFont(15, .light, relativeTo: .body)
             .tracking(-0.1)
             .foregroundStyle(AppColors.primaryText)
             .tint(AppColors.primaryText)
@@ -383,7 +383,7 @@ struct MindView: View {
                 withAnimation(AppAnimation.springFluid) { appState.isRecalling = true }
             } label: {
                 Image(systemName: "sparkle.magnifyingglass")
-                    .font(.system(size: 14, weight: .light))
+                    .appFont(14, .light, relativeTo: .subheadline)
                     .foregroundStyle(AppColors.primaryText)
                     .frame(width: 32, height: 32)
                     .background(AppColors.ink.opacity(0.06))
@@ -391,6 +391,8 @@ struct MindView: View {
                     .overlay(Circle().stroke(AppColors.ink.opacity(0.04), lineWidth: 0.5))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("recall")
+            .accessibilityHint("search your thoughts by meaning")
             .padding(.trailing, 8)
 
             Button {
@@ -399,7 +401,7 @@ struct MindView: View {
                 HStack(spacing: 8) {
                     libraryStackIcon
                     Text("library")
-                        .font(.system(size: 13, weight: .regular))
+                        .appFont(13, .regular, relativeTo: .subheadline)
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.primaryText)
                 }
@@ -422,6 +424,7 @@ struct MindView: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("library, \(displayedLinks.count) saved links")
         }
         .padding(.horizontal, 20)
         .frame(height: 44)
@@ -445,18 +448,18 @@ struct MindView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(timeGreeting)
-                    .font(.system(size: 12, weight: .light))
+                    .appFont(12, .light, relativeTo: .caption)
                     .tracking(-0.05)
                     .foregroundStyle(AppColors.tertiaryText)
 
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text("mind")
-                        .font(.system(size: 34, weight: .heavy))
+                        .appFont(34, .heavy, relativeTo: .largeTitle)
                         .tracking(-1)
                         .foregroundStyle(AppColors.primaryText)
 
                     Text(" · \(filteredNotes.count) thought\(filteredNotes.count == 1 ? "" : "s")")
-                        .font(.system(size: 12, weight: .light))
+                        .appFont(12, .light, relativeTo: .caption)
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.tertiaryText)
                         .padding(.leading, 2)
@@ -471,7 +474,7 @@ struct MindView: View {
                 withAnimation(AppAnimation.springFluid) { appState.isShowingSettings = true }
             } label: {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14, weight: .light))
+                    .appFont(14, .light, relativeTo: .subheadline)
                     .foregroundStyle(AppColors.secondaryText)
                     .frame(width: 32, height: 32)
                     .background(AppColors.ink.opacity(0.04))
@@ -525,7 +528,7 @@ struct MindView: View {
                                 // First note ceremony
                                 if i == 0 && showFirstNoteCeremony {
                                     Text("your first thought.")
-                                        .font(.system(size: 12, weight: .light))
+                                        .appFont(12, .light, relativeTo: .caption)
                                         .italic()
                                         .tracking(-0.05)
                                         .foregroundStyle(AppColors.tertiaryText)
@@ -632,7 +635,7 @@ struct MindView: View {
         let proc = processor
         Task {
             let note = await proc.createNote(from: text)
-            let embedded = EmbeddingService.shared.embed(note.embeddingSource)
+            let embedded = EmbeddingService.shared.embed(note.embeddingInput)
             note.embedding = embedded.vector
             note.langCode = embedded.language
             await MainActor.run {
@@ -774,7 +777,7 @@ struct MindView: View {
         guard !pending.isEmpty else { return }
         Task { @MainActor in
             for note in pending {
-                let embedded = EmbeddingService.shared.embed(note.embeddingSource)
+                let embedded = EmbeddingService.shared.embed(note.embeddingInput)
                 note.embedding = embedded.vector
                 note.langCode = embedded.language
             }

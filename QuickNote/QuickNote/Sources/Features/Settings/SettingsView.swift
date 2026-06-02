@@ -34,7 +34,7 @@ struct SettingsView: View {
             handle
 
             Text("settings")
-                .font(.system(size: 22, weight: .bold))
+                .appFont(22, .bold, relativeTo: .title2)
                 .tracking(-0.5)
                 .foregroundStyle(AppColors.primaryText)
                 .padding(.bottom, 24)
@@ -101,9 +101,9 @@ struct SettingsView: View {
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: mode.icon)
-                            .font(.system(size: 16, weight: .light))
+                            .appFont(16, .light, relativeTo: .body)
                         Text(mode.label)
-                            .font(.system(size: 12, weight: .medium))
+                            .appFont(12, .medium, relativeTo: .caption)
                             .tracking(-0.05)
                     }
                     .foregroundStyle(active ? AppColors.onAccent : AppColors.secondaryText)
@@ -124,7 +124,7 @@ struct SettingsView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10.5, weight: .medium))
+            .appFont(10.5, .medium, relativeTo: .caption2)
             .tracking(1.4)
             .foregroundStyle(AppColors.tertiaryText)
             .padding(.bottom, 12)
@@ -133,15 +133,15 @@ struct SettingsView: View {
     private func rowLabel(icon: String, text: String, detail: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .foregroundStyle(AppColors.secondaryText)
                 .frame(width: 22)
             Text(text)
-                .font(.system(size: 15, weight: .light))
+                .appFont(15, .light, relativeTo: .body)
                 .foregroundStyle(AppColors.primaryText)
             Spacer()
             Text(detail)
-                .font(.system(size: 13, weight: .light))
+                .appFont(13, .light, relativeTo: .subheadline)
                 .foregroundStyle(AppColors.tertiaryText)
         }
         .frame(minHeight: 36)
