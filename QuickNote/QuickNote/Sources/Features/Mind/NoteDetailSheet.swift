@@ -29,6 +29,10 @@ struct NoteDetailSheet: View {
     @State private var sheetDragOffset: CGFloat = 0
     // Fix 8: flag to suppress animation during active drag
     @State private var isDragging = false
+    // Calendar capture (Pro)
+    @State private var showCalProPrompt = false
+    @State private var addingEvent = false
+    @State private var calError: String? = nil
 
     private var relatedNotes: [Note] {
         relatedNoteIDs.compactMap { id in allNotes.first { $0.id == id } }
@@ -76,6 +80,155 @@ struct NoteDetailSheet: View {
         .task {
             relatedNoteIDs = (try? await processor.findRelated(for: note, allNotes: allNotes)) ?? []
         }
+        .sheet(isPresented: $showCalProPrompt) {
+            ProUpgradeSheet()
+        }
+    }
+
+    // MARK: - Movie hero (media enrichment)
+
+    @ViewBuilder
+    private var movieHero: some View {
+        if let media = note.media {
+            VStack(alignment: .leading, spacing: 0) {
+                if let data = media.posterData, let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 150)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(.bottom, 12)
+                }
+                Text(media.title)
+                    .appFont(18, .semibold, relativeTo: .title3)
+                    .tracking(-0.3)
+                    .foregroundStyle(AppColors.primaryText)
+                if !media.metaLine.isEmpty {
+                    Text(media.metaLine)
+                        .appFont(12.5, .light, relativeTo: .caption)
+                        .foregroundStyle(AppColors.secondaryText)
+                        .padding(.top, 3)
+                }
+                if let overview = media.overview {
+                    Text(overview)
+                        .appFont(13, .light, relativeTo: .subheadline)
+                        .lineSpacing(4)
+                        .foregroundStyle(AppColors.secondaryText)
+                        .padding(.top, 8)
+                }
+            }
+        }
+    }
+
+    // MARK: - Calendar event card (Pro)
+
+    private static let eventDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE, MMM d · h:mm a"; return f
+    }()
+    private static let eventDayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE, MMM d"; return f
+    }()
+
+    private var eventCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("EVENT")
+                .appFont(10.5, .medium, relativeTo: .caption2)
+                .tracking(1.4)
+                .foregroundStyle(AppColors.tertiaryText)
+                .padding(.bottom, 12)
+
+            HStack(spacing: 12) {
+                Image(systemName: "calendar")
+                    .appFont(16, .light, relativeTo: .body)
+                    .foregroundStyle(AppColors.secondaryText)
+                    .frame(width: 38, height: 38)
+                    .background(AppColors.ink.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(note.eventTitle ?? "Event")
+                        .appFont(15, .regular, relativeTo: .body)
+                        .tracking(-0.1)
+                        .foregroundStyle(AppColors.primaryText)
+                        .lineLimit(1)
+                    if let date = note.eventDate {
+                        Text(note.eventHasTime
+                             ? Self.eventDateFormatter.string(from: date)
+                             : Self.eventDayFormatter.string(from: date))
+                            .appFont(12.5, .light, relativeTo: .caption)
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                }
+
+                Spacer()
+
+                Button(action: addToCalendar) {
+                    Group {
+                        if addingEvent {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("add")
+                                .appFont(13, .medium, relativeTo: .subheadline)
+                                .foregroundStyle(AppColors.onAccent)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 34)
+                    .background(AppColors.ink)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(addingEvent)
+            }
+            .padding(12)
+            .background(AppColors.ink.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(AppColors.ink.opacity(0.06), lineWidth: 0.5)
+            )
+
+            if let err = calError {
+                Text(err)
+                    .appFont(12, .light, relativeTo: .caption)
+                    .foregroundStyle(AppColors.tertiaryText)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    private func addToCalendar() {
+        guard !addingEvent else { return }
+        if !appState.isPro { showCalProPrompt = true; return }
+        guard let title = note.eventTitle, let date = note.eventDate else { return }
+
+        addingEvent = true
+        calError = nil
+        let hasTime = note.eventHasTime
+        let body = note.displayText ?? note.rawText
+        Task {
+            do {
+                let id = try await CalendarService.shared.addEvent(
+                    title: title, date: date, hasTime: hasTime, notes: body)
+                await MainActor.run {
+                    addingEvent = false
+                    withAnimation(AppAnimation.springFluid) { note.calendarEventID = id }
+                    HapticEngine.archive()
+                }
+            } catch {
+                await MainActor.run {
+                    addingEvent = false
+                    withAnimation { calError = error.localizedDescription }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        await MainActor.run { withAnimation { calError = nil } }
+                    }
+                }
+            }
+        }
     }
 
     private var sheetContent: some View {
@@ -88,6 +241,14 @@ struct NoteDetailSheet: View {
                     headerRow.padding(.bottom, 8)
                     subtitleText.padding(.bottom, 10)
                     noteTextArea.padding(.bottom, 18)
+
+                    if note.hasMedia {
+                        movieHero.padding(.bottom, 18)
+                    }
+
+                    if note.hasPendingEvent {
+                        eventCard.padding(.bottom, 18)
+                    }
 
                     if showEnhancer {
                         AIEnhancerInline(
