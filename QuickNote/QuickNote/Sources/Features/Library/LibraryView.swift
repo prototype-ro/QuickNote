@@ -512,6 +512,11 @@ struct LibraryView: View {
                 if let thumb = meta.thumbnailURLString { link.thumbnailURL = thumb }
                 if let imageData { link.thumbnailData = imageData }
                 if let author = meta.author { link.author = author }
+                if var product = meta.product {
+                    product.imageData = imageData ?? link.thumbnailData
+                    link.product = product
+                    link.kind = .product
+                }
             }
         }
     }

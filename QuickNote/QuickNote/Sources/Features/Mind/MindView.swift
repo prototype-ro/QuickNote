@@ -619,9 +619,15 @@ struct MindView: View {
                 if let title = meta.title, !title.isEmpty { link.title = title }
                 if let thumb = meta.thumbnailURLString { link.thumbnailURL = thumb }
                 if let author = meta.author { link.author = author }
-                if let thumb = meta.thumbnailURLString,
-                   let data = await LinkMetadataService.shared.imageData(from: thumb) {
-                    link.thumbnailData = data
+                var downloadedThumb: Data? = nil
+                if let thumb = meta.thumbnailURLString {
+                    downloadedThumb = await LinkMetadataService.shared.imageData(from: thumb)
+                    if let downloadedThumb { link.thumbnailData = downloadedThumb }
+                }
+                if var product = meta.product {
+                    product.imageData = downloadedThumb ?? link.thumbnailData
+                    link.product = product
+                    link.kind = .product
                 }
                 withAnimation { appState.isSavingToLibrary = false }
                 withAnimation(AppAnimation.springFluid) { appState.toastVisible = true }
