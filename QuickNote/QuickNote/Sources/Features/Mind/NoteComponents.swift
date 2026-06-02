@@ -361,9 +361,9 @@ struct NoteCard: View {
         .overlay(
             ZStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.white.opacity(0.28), lineWidth: 3.5)
+                    .strokeBorder(Color.white.opacity(0.28), lineWidth: 3.5)
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(
+                    .strokeBorder(
                         LinearGradient(
                             colors: [Color.white.opacity(0.75), Color.white.opacity(0.0)],
                             startPoint: .top,

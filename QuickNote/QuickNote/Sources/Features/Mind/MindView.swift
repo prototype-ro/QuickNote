@@ -619,6 +619,10 @@ struct MindView: View {
                 if let title = meta.title, !title.isEmpty { link.title = title }
                 if let thumb = meta.thumbnailURLString { link.thumbnailURL = thumb }
                 if let author = meta.author { link.author = author }
+                if let thumb = meta.thumbnailURLString,
+                   let data = await LinkMetadataService.shared.imageData(from: thumb) {
+                    link.thumbnailData = data
+                }
                 withAnimation { appState.isSavingToLibrary = false }
                 withAnimation(AppAnimation.springFluid) { appState.toastVisible = true }
                 try? await Task.sleep(nanoseconds: 2_400_000_000)

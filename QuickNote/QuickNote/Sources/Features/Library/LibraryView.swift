@@ -10,6 +10,8 @@ struct LibraryView: View {
     @Query(sort: \Link.createdAt, order: .reverse) private var savedLinks: [Link]
     @Query(filter: #Predicate<Note> { !$0.isArchived }) private var activeNotes: [Note]
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var showAddLink = false
     @State private var pendingURL = ""
     @State private var peekLink: Link? = nil
@@ -309,7 +311,11 @@ struct LibraryView: View {
             }
         }
         .task {
+            drainPendingLinks()
             await fetchMissingMetadata()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { drainPendingLinks() }
         }
     }
 
@@ -470,6 +476,19 @@ struct LibraryView: View {
         withAnimation(AppAnimation.springFluid) { modelContext.delete(link) }
     }
 
+    private func drainPendingLinks() {
+        let groupID = "group.com.prototype.QuickNote"
+        guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID) else { return }
+        let fileURL = container.appendingPathComponent("pendingLinks.json")
+        guard let data = try? Data(contentsOf: fileURL),
+              let items = try? JSONDecoder().decode([[String: String]].self, from: data) else { return }
+        try? FileManager.default.removeItem(at: fileURL)
+        for item in items {
+            guard let content = item["content"], !content.isEmpty else { continue }
+            saveLink(content)
+        }
+    }
+
     private func saveLink(_ urlString: String) {
         let host = extractHost(from: urlString)
         let kind = LinkKind.detect(from: urlString)
@@ -483,16 +502,22 @@ struct LibraryView: View {
         let kind = link.kind
         Task {
             let meta = await LinkMetadataService.shared.fetch(urlString: urlString, kind: kind)
+            // Download bytes off the main actor so the preview survives URL expiry.
+            var imageData: Data? = nil
+            if let thumb = meta.thumbnailURLString {
+                imageData = await LinkMetadataService.shared.imageData(from: thumb)
+            }
             await MainActor.run {
                 if let title = meta.title, !title.isEmpty { link.title = title }
                 if let thumb = meta.thumbnailURLString { link.thumbnailURL = thumb }
+                if let imageData { link.thumbnailData = imageData }
                 if let author = meta.author { link.author = author }
             }
         }
     }
 
     private func fetchMissingMetadata() async {
-        for link in savedLinks where link.thumbnailURL == nil {
+        for link in savedLinks where link.thumbnailData == nil {
             fetchAndApplyMetadata(link)
         }
     }

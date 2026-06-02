@@ -140,7 +140,10 @@ struct LinkThumbnail: View {
 
     @ViewBuilder
     private var thumbnailContent: some View {
-        if let urlString = link.thumbnailURL, let url = URL(string: urlString) {
+        if let data = link.thumbnailData, let uiImage = UIImage(data: data) {
+            // Locally cached bytes — survives remote URL expiry.
+            Image(uiImage: uiImage).resizable().scaledToFill()
+        } else if let urlString = link.thumbnailURL, let url = URL(string: urlString) {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):

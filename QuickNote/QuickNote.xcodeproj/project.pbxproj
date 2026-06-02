@@ -57,11 +57,6 @@
 			path = QuickNote;
 			sourceTree = "<group>";
 		};
-		71B1430B2FA4C496002EF4E0 /* QuickNoteShareExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = QuickNoteShareExtension;
-			sourceTree = "<group>";
-		};
 		71B143202FA4C638002EF4E0 /* QuickNoteShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -94,7 +89,6 @@
 			isa = PBXGroup;
 			children = (
 				713614082F9CED9200EAF072 /* QuickNote */,
-				71B1430B2FA4C496002EF4E0 /* QuickNoteShareExtension */,
 				71B143202FA4C638002EF4E0 /* QuickNoteShareExtension */,
 				713614072F9CED9200EAF072 /* Products */,
 				713614312F9CFDA100EAF072 /* Config.xconfig */,

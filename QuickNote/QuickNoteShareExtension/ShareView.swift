@@ -36,13 +36,15 @@ struct ShareView: View {
                         .tracking(-0.5)
                         .foregroundStyle(Color(hex: "0A0A0B"))
 
-                    Text(host)
-                        .font(.system(size: 13, weight: .light))
-                        .foregroundStyle(Color(hex: "6B7280"))
+                    if !host.isEmpty {
+                        Text(host)
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(Color(hex: "6B7280"))
+                    }
                 }
                 .padding(.bottom, 18)
 
-                // URL preview
+                // URL / content preview
                 Text(urlString)
                     .font(.system(size: 11, weight: .light))
                     .foregroundStyle(Color(hex: "9CA3AF"))
@@ -128,7 +130,7 @@ struct ShareView: View {
     }
 }
 
-// MARK: - Color(hex:) — duplicated here since extensions are separate binaries
+// MARK: - Color(hex:) — duplicated here since the extension is a separate binary
 
 private extension Color {
     init(hex: String) {
@@ -142,6 +144,6 @@ private extension Color {
         case 8: (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default: (a, r, g, b) = (255, 0, 0, 0)
         }
-        self.init(.sRGB, red: Double(r)/255, green: Double(g)/255, blue: Double(b)/255, opacity: Double(a)/255)
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }

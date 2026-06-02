@@ -38,6 +38,10 @@ public final class Link {
     public var duration: String?
     public var readTime: String?
     public var thumbnailURL: String?
+    /// Locally cached thumbnail bytes. Some hosts (e.g. Instagram/fbcdn) serve
+    /// signed URLs that expire after a few days — we download and persist the
+    /// image here so the preview survives. Stored outside the main store.
+    @Attribute(.externalStorage) public var thumbnailData: Data?
     public var tags: [String]
     public var userNote: String?
     public var aspectRatio: Double
@@ -54,6 +58,7 @@ public final class Link {
         duration: String? = nil,
         readTime: String? = nil,
         thumbnailURL: String? = nil,
+        thumbnailData: Data? = nil,
         tags: [String] = [],
         userNote: String? = nil,
         aspectRatio: Double = 1.0,
@@ -69,6 +74,7 @@ public final class Link {
         self.duration = duration
         self.readTime = readTime
         self.thumbnailURL = thumbnailURL
+        self.thumbnailData = thumbnailData
         self.tags = tags
         self.userNote = userNote
         self.aspectRatio = aspectRatio
