@@ -8,21 +8,27 @@ public let kUseMockProcessor = false
 // MARK: - Enhancement modes
 
 public enum EnhancementMode: String, CaseIterable {
-    case clarity, expand, sharpen, reframe
+    /// One smart enhancer that infers intent from the content — fixes spelling,
+    /// grammar, and word choice; structures brain-dumps (groceries, tasks) into
+    /// clean lists; tightens prose. Replaces the former clarity/expand/sharpen/
+    /// reframe modes. Raw value kept stable for migration of `note.enhancementMode`.
+    case enhance
 
-    var label: String { rawValue.capitalized }
+    var label: String { "Enhance" }
 
     var systemPrompt: String {
-        switch self {
-        case .clarity:
-            return "Rewrite the following note in clear, concise prose. Keep the exact same meaning and intent. Do not add information. Do not use bullet points. Return only the rewritten text, nothing else."
-        case .expand:
-            return "The following is a brief idea or fragment. Expand it into a structured note with 2-3 sentences of context and one clearly stated angle or direction. Do not add speculation beyond what is implied. Return only the expanded note."
-        case .sharpen:
-            return "The following contains one or more tasks. Rewrite each task to be specific, actionable, and time-aware where possible. Extract implied deadlines or urgency. Return as a clean list, one task per line, no bullet characters. Return only the sharpened tasks."
-        case .reframe:
-            return "The following note may be anxious, vague, or emotionally charged. Rewrite it as a calm, clear observation or structured list of concrete next steps. Do not dismiss or minimize the emotion — just translate it into something actionable and readable. Return only the reframed text."
-        }
+        """
+        You are a writing assistant. Improve the user's note while preserving \
+        their meaning and voice. Infer intent from the content:
+        - Fix spelling, grammar, punctuation, and awkward word choice.
+        - If it reads as a list or brain-dump (e.g. groceries, errands, tasks), \
+        organize it into a clean, logically grouped list — one item per line, no \
+        bullet characters or numbering.
+        - If it is prose, tighten it for clarity and flow.
+        Do not add new information, opinions, or facts the user did not write. Do \
+        not use markdown headers, bold, or emphasis. Return only the improved text, \
+        nothing else.
+        """
     }
 }
 
@@ -33,6 +39,35 @@ public struct ProcessedNoteResponse: Codable {
     public let tasks: [String]
     public let tags: [String]
     public let summary: String
+    /// A scheduleable event extracted from the note, when one is clearly present.
+    public var event: DetectedEvent?
+    /// Media (movie) detected for enrichment, when clearly present.
+    public var media: DetectedMedia?
+
+    public init(type: String, tasks: [String], tags: [String], summary: String,
+                event: DetectedEvent? = nil, media: DetectedMedia? = nil) {
+        self.type = type
+        self.tasks = tasks
+        self.tags = tags
+        self.summary = summary
+        self.event = event
+        self.media = media
+    }
+}
+
+/// A calendar-able event the model found in free text. `date` is an ISO-ish
+/// local datetime string ("2026-09-19T09:00:00") or date-only ("2026-09-19").
+public struct DetectedEvent: Codable {
+    public let title: String
+    public let date: String
+    public let hasTime: Bool
+}
+
+/// A media item the model found in free text (currently movies). `query` is a
+/// search string for TMDB, e.g. "Obsession".
+public struct DetectedMedia: Codable {
+    public let kind: String     // "movie"
+    public let query: String
 }
 
 // MARK: - Errors
@@ -96,8 +131,33 @@ public final class NoteProcessor {
             processed = localClassify(rawText: rawText)
         }
         let noteType = NoteType(rawValue: processed.type.lowercased()) ?? .note
-        return Note(rawText: rawText, type: noteType, tasks: processed.tasks,
-                    tags: processed.tags, summary: processed.summary)
+        let note = Note(rawText: rawText, type: noteType, tasks: processed.tasks,
+                        tags: processed.tags, summary: processed.summary)
+        if let event = processed.event, let date = Self.parseEventDate(event.date) {
+            note.eventTitle = event.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            note.eventDate = date
+            note.eventHasTime = event.hasTime
+            if note.dueDate == nil { note.dueDate = date }
+        }
+        if let media = processed.media, media.kind == "movie" {
+            note.media = await TMDBService.shared.lookup(query: media.query)
+        }
+        return note
+    }
+
+    /// Parses the model's local datetime string into a `Date`, accepting both
+    /// "yyyy-MM-dd'T'HH:mm:ss" and date-only "yyyy-MM-dd". Interpreted in the
+    /// device's current time zone (the prompt resolves relative days locally).
+    static func parseEventDate(_ string: String) -> Date? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        for format in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"] {
+            f.dateFormat = format
+            if let d = f.date(from: trimmed) { return d }
+        }
+        return nil
     }
 
     // MARK: - AI Enhancement
@@ -105,17 +165,12 @@ public final class NoteProcessor {
     public func enhanceNote(rawText: String, mode: EnhancementMode) async throws -> String {
         if useMock {
             try? await Task.sleep(nanoseconds: 900_000_000)
-            // Mock: prefix with mode label so it's visibly different
-            switch mode {
-            case .clarity:
-                return rawText.components(separatedBy: ". ").first.map { $0 + "." } ?? rawText
-            case .expand:
-                return "\(rawText) This connects to a broader pattern worth exploring further, with implications that surface once the core idea is given room to breathe."
-            case .sharpen:
-                return rawText.components(separatedBy: CharacterSet.newlines).map { "→ \($0.trimmingCharacters(in: .whitespaces))" }.joined(separator: "\n")
-            case .reframe:
-                return "Here's a clearer frame: \(rawText.lowercased()). The next concrete step is to decide what this actually requires."
-            }
+            // Mock: lightly clean whitespace so the result is visibly different.
+            return rawText
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
         }
         return try await apiEnhance(rawText: rawText, mode: mode)
     }
@@ -333,12 +388,23 @@ public final class NoteProcessor {
         guard !apiKey.isEmpty else { throw NoteProcessorError.missingAPIKey }
         guard let url = URL(string: baseURL) else { throw NoteProcessorError.invalidURL }
 
+        let now = Date()
+        let dateFmt = DateFormatter()
+        dateFmt.dateFormat = "EEEE, yyyy-MM-dd HH:mm"
+        let nowString = dateFmt.string(from: now)
+
         let systemPrompt = """
-        You are a note classification and extraction assistant. Analyze the user's input and return a JSON object with exactly these fields:
+        You are a note classification and extraction assistant. The current local date and time is \(nowString). Analyze the user's input and return a JSON object with exactly these fields:
         - type: one of "task", "idea", "note", or "link"
         - tasks: array of extracted action items (empty array if none)
         - tags: array of 1-5 relevant lowercase tags (no # symbol)
         - summary: one sentence summary of the content
+        - event: a calendar event IF the note clearly describes something scheduleable with a specific date or day (e.g. "Anna's birthday 19th Sept 9am", "dentist tuesday 3pm", "movie saturday"). Otherwise null. When present, event is an object with:
+            - title: a short event name (e.g. "Anna's birthday"), excluding any to-do part
+            - date: the resolved local datetime as "yyyy-MM-dd'T'HH:mm:ss" when a time is given, or date-only "yyyy-MM-dd" when no time is given. Resolve relative days ("saturday", "tomorrow") against the current date above, choosing the next future occurrence.
+            - hasTime: true if a specific time was given, false otherwise
+          Any imperative to-do attached to the event (e.g. "buy gift") must ALSO appear in the tasks array.
+        - media: an object IF the note expresses intent to watch/see a specific named MOVIE (e.g. "watch obsession saturday", "see the new dune movie"). Otherwise null. When present: { "kind": "movie", "query": "<the movie's title only, no extra words>" }. Only set this for movies, not music, articles, or generic links.
         Respond ONLY with valid JSON, no markdown formatting or explanation.
         """
         let body: [String: Any] = [
@@ -448,7 +514,9 @@ public final class NoteProcessor {
                 type: raw.type,
                 tasks: raw.tasks.map { Self.stripMarkdown($0) },
                 tags: raw.tags,
-                summary: Self.stripMarkdown(raw.summary)
+                summary: Self.stripMarkdown(raw.summary),
+                event: raw.event,
+                media: raw.media
             )
         } catch {
             throw NoteProcessorError.decodingError(error)

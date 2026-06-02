@@ -17,7 +17,7 @@ actor LinkMetadataService {
         case .youtube:   return await fetchYouTube(urlString: urlString)
         case .spotify:   return await fetchOEmbed("https://open.spotify.com/oembed", url: urlString)
         case .instagram: return await fetchInstagram(urlString: urlString)
-        case .tiktok, .article, .bare: return await fetchOpenGraph(urlString: urlString)
+        case .tiktok, .article, .bare, .product: return await fetchOpenGraph(urlString: urlString)
         }
     }
 

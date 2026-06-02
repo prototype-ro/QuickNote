@@ -16,6 +16,7 @@ struct MockThumb: View {
         case .spotify:   return (Color(hex: "0e1a14"), Color(hex: "1a2a20"), Color(hex: "0a140e"))
         case .article:   return (Color(hex: "e8e6e1"), Color(hex: "d8d4cc"), Color(hex: "cdc8be"))
         case .bare:      return (Color(hex: "dcdfe3"), Color(hex: "cdd2d8"), Color(hex: "bec4cc"))
+        case .product:   return (Color(hex: "e6e3ea"), Color(hex: "d6d2dc"), Color(hex: "c8c2d0"))
         }
     }
 
