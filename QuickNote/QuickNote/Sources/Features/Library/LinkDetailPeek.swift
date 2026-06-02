@@ -40,6 +40,10 @@ struct LinkDetailPeek: View {
                             titleSection
                             // Fix 7: 20pt between sections
                             Divider().opacity(0.1).padding(.vertical, 20)
+                            if link.product != nil {
+                                productSection
+                                Divider().opacity(0.1).padding(.vertical, 20)
+                            }
                             urlSection
                             Divider().opacity(0.1).padding(.vertical, 20)
                             tagsSection
@@ -120,6 +124,53 @@ struct LinkDetailPeek: View {
     }
 
     // MARK: - URL
+
+    // MARK: - Product (enrichment)
+
+    @ViewBuilder
+    private var productSection: some View {
+        if let product = link.product {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("PRODUCT")
+                    .appFont(10.5, .medium, relativeTo: .caption2)
+                    .tracking(1.4)
+                    .foregroundStyle(AppColors.tertiaryText)
+
+                if let data = product.imageData, let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 160)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+
+                Text(product.name)
+                    .appFont(15, .semibold, relativeTo: .body)
+                    .tracking(-0.2)
+                    .foregroundStyle(AppColors.primaryText)
+
+                HStack(spacing: 8) {
+                    if let price = product.priceText {
+                        Text(price)
+                            .appFont(14, .semibold, relativeTo: .subheadline)
+                            .foregroundStyle(AppColors.primaryText)
+                    }
+                    if let brand = product.brand {
+                        Text(brand)
+                            .appFont(12, .light, relativeTo: .caption)
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                    if let availability = product.availability {
+                        Text("· \(availability)")
+                            .appFont(12, .light, relativeTo: .caption)
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                }
+            }
+        }
+    }
 
     private var urlSection: some View {
         VStack(alignment: .leading, spacing: 6) {
