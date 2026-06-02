@@ -307,6 +307,12 @@ struct NoteCard: View {
                 NoteBadge(kind: note.type, animate: isNew)
                 Spacer()
                 HStack(spacing: 6) {
+                    if note.hasMedia {
+                        Text("✦")
+                            .appFont(11, .medium, relativeTo: .caption)
+                            .foregroundStyle(AppColors.secondaryText)
+                            .accessibilityLabel("enriched")
+                    }
                     Text(relativeTime)
                         .appFont(12, .light, relativeTo: .caption)
                         .tracking(-0.1)
