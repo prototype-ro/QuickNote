@@ -326,7 +326,11 @@ struct NoteDetailSheet: View {
                         voiceHero.padding(.bottom, 18)
                     }
 
-                    noteTextArea.padding(.bottom, 18)
+                    // For a voice note the body is the transcript — hide the empty
+                    // editor (and its edit/enhance controls) until it's transcribed.
+                    if !note.isVoice || note.isTranscribed {
+                        noteTextArea.padding(.bottom, 18)
+                    }
 
                     if note.hasMedia {
                         movieHero.padding(.bottom, 18)

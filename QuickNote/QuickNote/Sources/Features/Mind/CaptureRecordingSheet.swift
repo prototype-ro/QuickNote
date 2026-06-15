@@ -94,6 +94,11 @@ struct CaptureRecordingSheet: View {
             Spacer(minLength: 6)
         }
         .padding(.top, 20)
+        .onDisappear {
+            // Swipe-to-dismiss mid-recording: stop the recorder, free the audio
+            // session, and discard the orphaned file (no note points at it).
+            if recorder.state == .recording { recorder.cancel() }
+        }
     }
 
     private func toggle() async {

@@ -6,6 +6,7 @@ import SwiftData
 struct MindView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Note.createdAt, order: .reverse) private var allNotes: [Note]
     @Query(sort: \Link.createdAt, order: .reverse) private var savedLinks: [Link]
@@ -776,7 +777,10 @@ struct MindView: View {
                 appState.stage = .inbox
                 appState.activeNote = nil
             }
-            if note.isVoice, let file = note.audioFileName { RecordingsDirectory.remove(file) }
+            if note.isVoice, let file = note.audioFileName {
+                if audioPlayer.playingFileName == file { audioPlayer.stop() }
+                RecordingsDirectory.remove(file)
+            }
             modelContext.delete(note)
         }
     }

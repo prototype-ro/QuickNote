@@ -54,6 +54,8 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
     private func stopTimer() { timer?.invalidate(); timer = nil }
 
     public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        isPlaying = false; progress = 0; currentTime = 0; stopTimer()
+        // Fully reset so the same recording can be replayed (leaving the player
+        // parked at end-of-file makes a second play() a no-op).
+        stop()
     }
 }

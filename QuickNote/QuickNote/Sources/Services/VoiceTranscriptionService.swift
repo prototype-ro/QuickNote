@@ -29,14 +29,25 @@ public enum VoiceTranscriptionService {
         request.shouldReportPartialResults = false
 
         return try await withCheckedThrowingContinuation { cont in
+            // The recognition callback can fire more than once (e.g. a final
+            // result followed by an error). Latch so the continuation resumes
+            // exactly once — resuming twice traps.
+            let lock = NSLock()
+            var done = false
+            func finish(_ resume: () -> Void) {
+                lock.lock(); defer { lock.unlock() }
+                guard !done else { return }
+                done = true
+                resume()
+            }
             recognizer.recognitionTask(with: request) { result, error in
-                if let error { cont.resume(throwing: error); return }
+                if let error { finish { cont.resume(throwing: error) }; return }
                 guard let result, result.isFinal else { return }
                 let text = result.bestTranscription.formattedString
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    cont.resume(throwing: TranscribeError.noSpeech)
+                    finish { cont.resume(throwing: TranscribeError.noSpeech) }
                 } else {
-                    cont.resume(returning: text)
+                    finish { cont.resume(returning: text) }
                 }
             }
         }

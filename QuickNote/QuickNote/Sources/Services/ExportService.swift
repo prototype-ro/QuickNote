@@ -32,7 +32,7 @@ enum ExportService {
             out += "## \(note.type.rawValue.uppercased()) — \(dateFormatter.string(from: note.createdAt))\n\n"
             if note.isVoice {
                 let body = note.isTranscribed ? (note.displayText ?? note.rawText) : note.voiceAnnotation
-                out += "🎙️ [voz \(Int(note.audioDuration))s] " + body + "\n\n"
+                out += "🎙️ [voz \(qnTimeString(note.audioDuration))] " + body + "\n\n"
             } else {
                 out += (note.displayText ?? note.rawText) + "\n\n"
             }
