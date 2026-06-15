@@ -140,6 +140,8 @@ final class AppState {
     var isRecalling: Bool = false
     /// Set when a deep link (widget) asks to open the capture bar focused.
     var shouldFocusCapture: Bool = false
+    /// Whether the voice recording capture sheet is presented.
+    var isRecordingVoice: Bool = false
 
     // Settings + appearance
     var isShowingSettings: Bool = false
