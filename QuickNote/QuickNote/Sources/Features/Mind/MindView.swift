@@ -518,17 +518,26 @@ struct MindView: View {
 
                         ForEach(Array(filteredNotes.enumerated()), id: \.element.id) { i, note in
                             VStack(spacing: 4) {
-                                NoteCard(
-                                    note: note,
-                                    repeatCount: repeatCounts[note.id] ?? 0,
-                                    isNew: note.id == latestNoteID,
-                                    onTap: {
-                                        appState.activeNote = note
-                                        withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
-                                    },
-                                    onArchive: { archiveNote(note) },
-                                    onDelete: { deleteNote(note) }
-                                )
+                                Group {
+                                    if note.isVoice {
+                                        VoiceCard(note: note, onOpen: {
+                                            appState.activeNote = note
+                                            withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
+                                        })
+                                    } else {
+                                        NoteCard(
+                                            note: note,
+                                            repeatCount: repeatCounts[note.id] ?? 0,
+                                            isNew: note.id == latestNoteID,
+                                            onTap: {
+                                                appState.activeNote = note
+                                                withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
+                                            },
+                                            onArchive: { archiveNote(note) },
+                                            onDelete: { deleteNote(note) }
+                                        )
+                                    }
+                                }
                                 .inkReveal(active: note.id == latestNoteID)
                                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                                 .animation(
