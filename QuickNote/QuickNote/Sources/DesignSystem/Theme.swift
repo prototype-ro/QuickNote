@@ -71,6 +71,9 @@ public enum AppColors {
 
     public static let accentBlue = Color(hex: "7AA7FF")      // halo, library badge
     public static let accentSage = Color(hex: "9BC4A8")
+    /// Voice category — soft sage. Whisper wash on cards, accent on controls.
+    /// Deeper in light for text contrast; lifts in dark. Adaptive via hex `dynamic`.
+    public static let voiceAccent = Color.dynamic(light: "739473", dark: "9EBD9E")
     public static let accentAmber = Color(hex: "E8B26A")
     public static let accentRose = Color(hex: "E59AAA")
     public static let accentViolet = Color(hex: "A89BD8")
