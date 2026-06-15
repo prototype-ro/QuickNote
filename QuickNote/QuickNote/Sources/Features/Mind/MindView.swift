@@ -776,6 +776,7 @@ struct MindView: View {
                 appState.stage = .inbox
                 appState.activeNote = nil
             }
+            if note.isVoice, let file = note.audioFileName { RecordingsDirectory.remove(file) }
             modelContext.delete(note)
         }
     }

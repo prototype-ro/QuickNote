@@ -30,7 +30,12 @@ enum ExportService {
         var out = "# QuickNote export\n\n_\(sorted.count) thoughts · \(dateFormatter.string(from: Date()))_\n\n"
         for note in sorted {
             out += "## \(note.type.rawValue.uppercased()) — \(dateFormatter.string(from: note.createdAt))\n\n"
-            out += (note.displayText ?? note.rawText) + "\n\n"
+            if note.isVoice {
+                let body = note.isTranscribed ? (note.displayText ?? note.rawText) : note.voiceAnnotation
+                out += "🎙️ [voz \(Int(note.audioDuration))s] " + body + "\n\n"
+            } else {
+                out += (note.displayText ?? note.rawText) + "\n\n"
+            }
             if !note.tasks.isEmpty {
                 out += note.tasks.map { "- [ ] \($0)" }.joined(separator: "\n") + "\n\n"
             }
