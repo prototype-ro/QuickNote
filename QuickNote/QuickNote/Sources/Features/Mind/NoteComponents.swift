@@ -176,6 +176,7 @@ struct NoteCard: View {
     @State private var showDeleteAlert = false
     @State private var isDragging = false
     @State private var dragAnchorOffset: CGFloat = 0
+    @State private var swipeJustOpened = false
     @State private var showTypeFlash: Bool = false
     @State private var flashedType: NoteType = .note
 
@@ -262,7 +263,9 @@ struct NoteCard: View {
             }
 
             Button {
-                if dragOffset != 0 {
+                if swipeJustOpened {
+                    swipeJustOpened = false
+                } else if dragOffset != 0 {
                     withAnimation(AppAnimation.springSnappy) { dragOffset = 0 }
                 } else {
                     onTap()
@@ -397,6 +400,7 @@ struct NoteCard: View {
                     isDragging = true
                     dragAnchorOffset = dragOffset
                 }
+                swipeJustOpened = true
                 let newOffset = dragAnchorOffset + value.translation.width
                 dragOffset = max(-actionWidth, min(actionWidth, newOffset))
             }
@@ -425,6 +429,7 @@ struct NoteCard: View {
                         dragOffset = -actionWidth
                     } else {
                         dragOffset = 0
+                        swipeJustOpened = false
                     }
                 }
             }
