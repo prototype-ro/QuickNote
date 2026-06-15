@@ -88,6 +88,14 @@
 			);
 			target = 71EA7A982FE0107A00E69A2B /* QuickNoteLiveActivityExtension */;
 		};
+		71EA7AC22FE02D6600E69A2B /* Exceptions for "QuickNote" folder in "QuickNoteLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared/RecordingActivityAttributes.swift,
+				Shared/StopRecordingIntent.swift,
+			);
+			target = 71EA7A982FE0107A00E69A2B /* QuickNoteLiveActivityExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -95,6 +103,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				71EA7A942FE0100300E69A2B /* Exceptions for "QuickNote" folder in "QuickNote" target */,
+				71EA7AC22FE02D6600E69A2B /* Exceptions for "QuickNote" folder in "QuickNoteLiveActivityExtension" target */,
 			);
 			path = QuickNote;
 			sourceTree = "<group>";

@@ -1,80 +1,77 @@
-//
-//  QuickNoteLiveActivityLiveActivity.swift
-//  QuickNoteLiveActivity
-//
-//  Created by Rodrigo Lage da Costa on 15/06/26.
-//
-
 import ActivityKit
 import WidgetKit
 import SwiftUI
+import AppIntents
 
-struct QuickNoteLiveActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        // Dynamic stateful properties about your activity go here!
-        var emoji: String
-    }
-
-    // Fixed non-changing properties about your activity go here!
-    var name: String
-}
-
-struct QuickNoteLiveActivityLiveActivity: Widget {
+struct QuickNoteRecordingLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: QuickNoteLiveActivityAttributes.self) { context in
-            // Lock screen/banner UI goes here
-            VStack {
-                Text("Hello \(context.state.emoji)")
+        ActivityConfiguration(for: RecordingActivityAttributes.self) { context in
+            // Lock screen / banner
+            HStack(spacing: 12) {
+                Circle().fill(.red).frame(width: 10, height: 10)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(context.attributes.title).font(.caption.weight(.medium))
+                    MiniWave(levels: context.state.levels).frame(height: 14)
+                }
+                Spacer()
+                Text(elapsedString(context.state.elapsed))
+                    .font(.system(.title3, design: .rounded).monospacedDigit())
+                Button(intent: StopRecordingIntent()) {
+                    Image(systemName: "stop.fill").foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
             }
-            .activityBackgroundTint(Color.cyan)
-            .activitySystemActionForegroundColor(Color.black)
+            .padding()
+            .activityBackgroundTint(Color.black.opacity(0.6))
+            .activitySystemActionForegroundColor(Color.white)
 
         } dynamicIsland: { context in
             DynamicIsland {
-                // Expanded UI goes here.  Compose the expanded UI through
-                // various regions, like leading/trailing/center/bottom
                 DynamicIslandExpandedRegion(.leading) {
-                    Text("Leading")
+                    Circle().fill(.red).frame(width: 10, height: 10)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("Trailing")
+                    Text(elapsedString(context.state.elapsed)).monospacedDigit()
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text("Bottom \(context.state.emoji)")
-                    // more content
+                    HStack(spacing: 10) {
+                        MiniWave(levels: context.state.levels).frame(height: 16)
+                        Button(intent: StopRecordingIntent()) {
+                            Image(systemName: "stop.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             } compactLeading: {
-                Text("L")
+                Circle().fill(.red).frame(width: 8, height: 8)
             } compactTrailing: {
-                Text("T \(context.state.emoji)")
+                Text(elapsedString(context.state.elapsed)).monospacedDigit().font(.caption2)
             } minimal: {
-                Text(context.state.emoji)
+                Circle().fill(.red).frame(width: 8, height: 8)
             }
-            .widgetURL(URL(string: "http://www.apple.com"))
-            .keylineTint(Color.red)
         }
     }
 }
 
-extension QuickNoteLiveActivityAttributes {
-    fileprivate static var preview: QuickNoteLiveActivityAttributes {
-        QuickNoteLiveActivityAttributes(name: "World")
+private func elapsedString(_ t: TimeInterval) -> String {
+    let s = Int(t)
+    return String(format: "%02d:%02d", s / 60, s % 60)
+}
+
+/// A small animated waveform motif from periodic levels (not a real-time meter).
+struct MiniWave: View {
+    let levels: [Double]
+    var body: some View {
+        GeometryReader { geo in
+            let n = max(levels.count, 1)
+            let w = max(1.5, (geo.size.width - CGFloat(n) * 2) / CGFloat(n))
+            HStack(alignment: .center, spacing: 2) {
+                ForEach(levels.indices, id: \.self) { i in
+                    Capsule().fill(.white.opacity(0.85))
+                        .frame(width: w, height: max(2, CGFloat(levels[i]) * geo.size.height))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
     }
-}
-
-extension QuickNoteLiveActivityAttributes.ContentState {
-    fileprivate static var smiley: QuickNoteLiveActivityAttributes.ContentState {
-        QuickNoteLiveActivityAttributes.ContentState(emoji: "😀")
-     }
-     
-     fileprivate static var starEyes: QuickNoteLiveActivityAttributes.ContentState {
-         QuickNoteLiveActivityAttributes.ContentState(emoji: "🤩")
-     }
-}
-
-#Preview("Notification", as: .content, using: QuickNoteLiveActivityAttributes.preview) {
-   QuickNoteLiveActivityLiveActivity()
-} contentStates: {
-    QuickNoteLiveActivityAttributes.ContentState.smiley
-    QuickNoteLiveActivityAttributes.ContentState.starEyes
 }
