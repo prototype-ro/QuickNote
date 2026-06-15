@@ -46,30 +46,35 @@ func qnTimeString(_ t: TimeInterval) -> String {
 // MARK: - Capture sheet
 struct CaptureRecordingSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let onSave: (_ fileName: String, _ duration: TimeInterval, _ waveform: [Float], _ drill: RoteiroDrill?) -> Void
+    private let coordinator = RecordingCoordinator.shared
 
-    @State private var recorder = AudioRecorderService()
     @State private var selectedDrill: RoteiroDrill? = nil
-    private var isRecording: Bool { recorder.state == .recording }
+    private var isRecording: Bool { coordinator.state == .recording }
 
     var body: some View {
         VStack(spacing: 20) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    DrillChip(label: "livre", selected: selectedDrill == nil) { selectedDrill = nil }
+                    DrillChip(label: "livre", selected: selectedDrill == nil) {
+                        selectedDrill = nil
+                        coordinator.selectedDrill = nil
+                    }
                     ForEach(RoteiroDrill.allCases) { d in
-                        DrillChip(label: d.label, selected: selectedDrill == d) { selectedDrill = d }
+                        DrillChip(label: d.label, selected: selectedDrill == d) {
+                            selectedDrill = d
+                            coordinator.selectedDrill = d
+                        }
                     }
                 }.padding(.horizontal, 16)
             }
             .disabled(isRecording).opacity(isRecording ? 0.4 : 1)
 
             Spacer(minLength: 0)
-            Text(qnTimeString(recorder.elapsed))
+            Text(qnTimeString(coordinator.elapsed))
                 .appFont(36, .light, relativeTo: .largeTitle)
                 .monospacedDigit()
                 .foregroundStyle(AppColors.primaryText)
-            LevelBar(level: recorder.level).frame(height: 26).padding(.horizontal, 44)
+            LevelBar(level: coordinator.level).frame(height: 26).padding(.horizontal, 44)
             Spacer(minLength: 0)
 
             Button { Task { await toggle() } } label: {
@@ -86,7 +91,7 @@ struct CaptureRecordingSheet: View {
             .buttonStyle(.plain)
             .accessibilityLabel(isRecording ? "parar gravação" : "iniciar gravação")
 
-            if recorder.state == .denied {
+            if coordinator.state == .denied {
                 Text("acesso ao microfone negado — habilite em ajustes")
                     .appFont(13)
                     .foregroundStyle(AppColors.secondaryText)
@@ -94,32 +99,29 @@ struct CaptureRecordingSheet: View {
             Spacer(minLength: 6)
         }
         .padding(.top, 20)
-        .onDisappear {
-            // Swipe-to-dismiss mid-recording: stop the recorder, free the audio
-            // session, and discard the orphaned file (no note points at it).
-            if recorder.state == .recording { recorder.cancel() }
-        }
     }
 
     private func toggle() async {
-        switch recorder.state {
-        case .idle, .denied: await recorder.start()
+        switch coordinator.state {
+        case .idle, .denied:
+            coordinator.selectedDrill = selectedDrill
+            await coordinator.start()
         case .recording:
-            if let r = recorder.stop() {
-                HapticEngine.submit()
-                onSave(r.fileName, r.duration, r.waveform, selectedDrill)
-                dismiss()
-            }
+            HapticEngine.submit()
+            coordinator.stop()
+            dismiss()
         }
     }
 }
 
-// MARK: - PlayerPanel (detail playback with real-waveform scrubber)
+// MARK: - PlayerPanel (detail playback with real-waveform scrubber + color stamp ticks)
 struct PlayerPanel: View {
     let fileName: String
     let peaks: [Float]
     let duration: TimeInterval
+    let marks: [VoiceMark]
     let player: AudioPlayerService
+    var onScrub: ((Double) -> Void)? = nil
 
     private var isThis: Bool { player.playingFileName == fileName }
     private var isPlaying: Bool { player.isPlaying && isThis }
@@ -139,11 +141,25 @@ struct PlayerPanel: View {
 
             VStack(spacing: 6) {
                 GeometryReader { geo in
-                    StaticWaveform(peaks: peaks, progress: progress)
-                        .contentShape(Rectangle())
-                        .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                            if isThis { player.seek(toFraction: min(1, max(0, v.location.x / geo.size.width))) }
-                        })
+                    ZStack(alignment: .leading) {
+                        StaticWaveform(peaks: peaks, progress: progress)
+                        ForEach(marks) { m in
+                            let x = duration > 0 ? CGFloat(m.time / duration) * geo.size.width : 0
+                            Rectangle()
+                                .fill(StampPalette.color(for: m.colorIndex))
+                                .frame(width: 2)
+                                .offset(x: x)
+                        }
+                    }
+                    .frame(height: 26)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { v in
+                                let f = min(1, max(0, v.location.x / geo.size.width))
+                                if isThis { player.seek(toFraction: f) } else { onScrub?(f) }
+                            }
+                    )
                 }
                 .frame(height: 26)
                 HStack {

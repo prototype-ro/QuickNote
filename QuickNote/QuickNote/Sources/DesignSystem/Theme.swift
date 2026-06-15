@@ -100,6 +100,23 @@ public enum AppColors {
     }
 }
 
+// MARK: - Stamp Palette
+
+/// Six fixed, distinct stamp hues for voice marks (index-stable for persistence).
+public enum StampPalette {
+    public static let colors: [Color] = [
+        Color(hex: "EF4444"), // red
+        Color(hex: "E8B26A"), // amber
+        Color(hex: "5FB87A"), // green
+        Color(hex: "4FB3B3"), // teal
+        Color(hex: "7AA7FF"), // blue
+        Color(hex: "A89BD8")  // violet
+    ]
+    public static func color(for index: Int) -> Color {
+        colors.indices.contains(index) ? colors[index] : colors[0]
+    }
+}
+
 // MARK: - Typography
 
 public enum AppTypography {
