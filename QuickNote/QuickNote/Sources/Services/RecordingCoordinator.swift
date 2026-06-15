@@ -28,6 +28,9 @@ public final class RecordingCoordinator {
         NotificationCenter.default.addObserver(forName: .stopRecordingRequested, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.stop() }
         }
+        // A prior run may have been killed mid-recording (or the Stop intent cold-launched
+        // us); clear any orphaned activity so the lock screen doesn't show a stale card.
+        endStaleActivities()
     }
 
     public func start() async {
@@ -63,8 +66,19 @@ public final class RecordingCoordinator {
         } catch {
             activity = nil
         }
+        activityTimer?.invalidate()
+        guard activity != nil else { return }   // request failed → no point ticking
         activityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pushActivityUpdate() }
+        }
+    }
+
+    /// Ends any Live Activity left over from a previous app run.
+    private func endStaleActivities() {
+        Task {
+            for activity in Activity<RecordingActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
         }
     }
 
