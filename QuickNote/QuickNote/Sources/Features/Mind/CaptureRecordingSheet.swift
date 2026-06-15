@@ -108,3 +108,81 @@ struct CaptureRecordingSheet: View {
         }
     }
 }
+
+// MARK: - PlayerPanel (detail playback with real-waveform scrubber)
+struct PlayerPanel: View {
+    let fileName: String
+    let peaks: [Float]
+    let duration: TimeInterval
+    let player: AudioPlayerService
+
+    private var isThis: Bool { player.playingFileName == fileName }
+    private var isPlaying: Bool { player.isPlaying && isThis }
+    private var progress: Double { isThis ? player.progress : 0 }
+    private var elapsed: TimeInterval { isThis ? player.currentTime : 0 }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Button { player.toggle(fileName: fileName) } label: {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .appFont(16, .semibold).foregroundStyle(AppColors.primaryText)
+                    .frame(width: 46, height: 46)
+                    .background(AppColors.voiceAccent.opacity(0.28), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isPlaying ? "pausar" : "tocar gravação")
+
+            VStack(spacing: 6) {
+                GeometryReader { geo in
+                    StaticWaveform(peaks: peaks, progress: progress)
+                        .contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+                            if isThis { player.seek(toFraction: min(1, max(0, v.location.x / geo.size.width))) }
+                        })
+                }
+                .frame(height: 26)
+                HStack {
+                    Text(qnTimeString(elapsed)).monospacedDigit(); Spacer()
+                    Text(qnTimeString(duration)).monospacedDigit()
+                }
+                .appFont(12).foregroundStyle(AppColors.secondaryText)
+            }
+        }
+        .padding(14)
+        .background(CategoryTint.wash(.voice), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+// MARK: - ReviewEditor (optional roteiro review loop)
+struct ReviewEditor: View {
+    @Binding var review: VoiceReview
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("\"tipo / né / então\"").appFont(15).foregroundStyle(AppColors.secondaryText)
+                Spacer()
+                Stepper(value: Binding(get: { review.fillerCount ?? 0 },
+                                       set: { review.fillerCount = $0 }), in: 0...99) {
+                    Text("\(review.fillerCount ?? 0)").monospacedDigit().foregroundStyle(AppColors.primaryText)
+                }
+                .labelsHidden()
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("ritmo").appFont(15).foregroundStyle(AppColors.secondaryText)
+                HStack(spacing: 8) {
+                    ForEach(RecordingPace.allCases) { p in
+                        DrillChip(label: p.label, selected: review.pace == p.rawValue) {
+                            review.pace = (review.pace == p.rawValue) ? nil : p.rawValue
+                        }
+                    }
+                }
+            }
+            quietField("1 coisa que melhorou", text: $review.improved)
+            quietField("1 coisa pra focar", text: $review.focusNext)
+        }
+    }
+    private func quietField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text, axis: .vertical).appFont(16).padding(12)
+            .background(AppColors.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}

@@ -10,6 +10,7 @@ struct NoteDetailSheet: View {
     var onDelete: () -> Void
 
     @Environment(AppState.self) private var appState
+    @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(filter: #Predicate<Note> { !$0.isArchived }) private var allNotes: [Note]
 
@@ -33,6 +34,9 @@ struct NoteDetailSheet: View {
     @State private var showCalProPrompt = false
     @State private var addingEvent = false
     @State private var calError: String? = nil
+    @State private var isTranscribing = false
+    @State private var showReview = false
+    @State private var transcribeError = false
 
     private var relatedNotes: [Note] {
         relatedNoteIDs.compactMap { id in allNotes.first { $0.id == id } }
@@ -78,6 +82,7 @@ struct NoteDetailSheet: View {
             Button("Cancel", role: .cancel) {}
         }
         .task {
+            showReview = !(note.voiceReview ?? VoiceReview()).isEmpty
             relatedNoteIDs = (try? await processor.findRelated(for: note, allNotes: allNotes)) ?? []
         }
         .sheet(isPresented: $showCalProPrompt) {
@@ -119,6 +124,83 @@ struct NoteDetailSheet: View {
                         .padding(.top, 8)
                 }
             }
+        }
+    }
+
+    // MARK: - Voice hero (audio capture)
+
+    @ViewBuilder
+    private var voiceHero: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let file = note.audioFileName {
+                PlayerPanel(fileName: file, peaks: note.waveform,
+                            duration: note.audioDuration, player: audioPlayer)
+            }
+
+            Menu {
+                Button("livre") { note.drill = nil }
+                ForEach(RoteiroDrill.allCases) { d in
+                    Button(d.label) { note.drill = d.rawValue }
+                }
+            } label: {
+                let label = note.drill.flatMap { RoteiroDrill(rawValue: $0)?.label } ?? "+ marcar exercício"
+                Text(label)
+                    .appFont(13, .medium)
+                    .foregroundStyle(note.drill != nil ? AppColors.voiceAccent : AppColors.secondaryText)
+                    .padding(.vertical, 6).padding(.horizontal, 12)
+                    .background(Capsule().fill((note.drill != nil ? AppColors.voiceAccent : AppColors.secondaryText).opacity(0.12)))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("anotações").appFont(14, .medium).foregroundStyle(AppColors.secondaryText)
+                TextEditor(text: Binding(get: { note.voiceAnnotation }, set: { note.voiceAnnotation = $0 }))
+                    .appFont(16).frame(minHeight: 110).scrollContentBackground(.hidden).padding(10)
+                    .background(CategoryTint.wash(.voice), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+
+            if !note.isTranscribed && VoiceTranscriptionService.isAvailable {
+                Button { Task { await transcribe() } } label: {
+                    HStack(spacing: 6) {
+                        if isTranscribing { ProgressView().controlSize(.small) }
+                        else { Image(systemName: "sparkles") }
+                        Text(isTranscribing ? "transcrevendo…" : "transcrever")
+                    }
+                    .appFont(15, .medium).foregroundStyle(AppColors.voiceAccent)
+                }
+                .buttonStyle(.plain)
+                .disabled(isTranscribing)
+            }
+            if transcribeError {
+                Text("não consegui transcrever — tente de novo")
+                    .appFont(12).foregroundStyle(AppColors.secondaryText)
+            }
+
+            DisclosureGroup(isExpanded: $showReview) {
+                ReviewEditor(review: Binding(
+                    get: { note.voiceReview ?? VoiceReview() },
+                    set: { note.voiceReview = $0.isEmpty ? nil : $0 }))
+                    .padding(.top, 8)
+            } label: {
+                Text("revisão rápida").appFont(14, .medium).foregroundStyle(AppColors.secondaryText)
+            }
+            .tint(AppColors.secondaryText)
+        }
+    }
+
+    private func transcribe() async {
+        guard let file = note.audioFileName else { return }
+        isTranscribing = true
+        transcribeError = false
+        defer { isTranscribing = false }
+        do {
+            let text = try await VoiceTranscriptionService.transcribe(fileName: file)
+            note.rawText = text
+            let embedded = EmbeddingService.shared.embed(note.embeddingInput)
+            note.embedding = embedded.vector
+            note.langCode = embedded.language
+            HapticEngine.classify()
+        } catch {
+            transcribeError = true
         }
     }
 
@@ -240,6 +322,10 @@ struct NoteDetailSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     headerRow.padding(.bottom, 8)
                     subtitleText.padding(.bottom, 10)
+                    if note.isVoice {
+                        voiceHero.padding(.bottom, 18)
+                    }
+
                     noteTextArea.padding(.bottom, 18)
 
                     if note.hasMedia {
