@@ -56,6 +56,18 @@ public final class Note {
     /// Language code (e.g. "en", "pt") of the model that produced `embedding`.
     /// Vectors are only compared within the same language. Inline default for migration.
     public var langCode: String = ""
+    /// Relative file name of the recording inside Documents/Recordings/ (voice notes).
+    public var audioFileName: String? = nil
+    /// Recording length in seconds.
+    public var audioDuration: Double = 0
+    /// Real downsampled amplitude peaks (0...1), ~48 bars, for the static waveform.
+    public var waveform: [Float] = []
+    /// Optional roteiro drill tag (RoteiroDrill rawValue).
+    public var drill: String? = nil
+    /// Optional speech-practice review loop.
+    public var voiceReview: VoiceReview? = nil
+    /// Freeform "anotações sobre a gravação" (kept separate from AI `summary`).
+    public var voiceAnnotation: String = ""
 
     public init(
         id: UUID = UUID(),
@@ -123,4 +135,8 @@ public final class Note {
 
     /// Whether this note carries media enrichment (renders ✦ + movie hero).
     public var hasMedia: Bool { media != nil }
+    /// Whether this is a voice (audio) capture.
+    public var isVoice: Bool { type == .voice }
+    /// A voice note has been transcribed once its text body is populated.
+    public var isTranscribed: Bool { isVoice && !rawText.isEmpty }
 }
