@@ -15,6 +15,7 @@ public enum CategoryTint {
         case .task:   return Color(red: 1.00, green: 0.82, blue: 0.45).opacity(0.07) // warm cream
         case .idea:   return Color(red: 0.70, green: 0.55, blue: 1.00).opacity(0.07) // soft lavender
         case .link:   return Color(red: 0.47, green: 0.62, blue: 0.95).opacity(0.07) // cool gray-blue
+        case .voice:  return Color(red: 0.45, green: 0.58, blue: 0.45).opacity(0.07) // soft sage
         case .note, .digest: return .clear
         }
     }

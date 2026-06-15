@@ -6,6 +6,7 @@ import SwiftData
 struct MindView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Note.createdAt, order: .reverse) private var allNotes: [Note]
     @Query(sort: \Link.createdAt, order: .reverse) private var savedLinks: [Link]
@@ -175,6 +176,16 @@ struct MindView: View {
             withAnimation(.easeInOut(duration: 0.18)) {
                 captureURLDetected = !trimmed.isEmpty && isURL(trimmed)
             }
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.isRecordingVoice },
+            set: { appState.isRecordingVoice = $0 }
+        )) {
+            CaptureRecordingSheet { fileName, duration, waveform, drill in
+                insertVoiceNote(fileName: fileName, duration: duration, waveform: waveform, drill: drill)
+            }
+            .presentationDetents([.height(380)])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -508,17 +519,26 @@ struct MindView: View {
 
                         ForEach(Array(filteredNotes.enumerated()), id: \.element.id) { i, note in
                             VStack(spacing: 4) {
-                                NoteCard(
-                                    note: note,
-                                    repeatCount: repeatCounts[note.id] ?? 0,
-                                    isNew: note.id == latestNoteID,
-                                    onTap: {
-                                        appState.activeNote = note
-                                        withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
-                                    },
-                                    onArchive: { archiveNote(note) },
-                                    onDelete: { deleteNote(note) }
-                                )
+                                Group {
+                                    if note.isVoice {
+                                        VoiceCard(note: note, onOpen: {
+                                            appState.activeNote = note
+                                            withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
+                                        })
+                                    } else {
+                                        NoteCard(
+                                            note: note,
+                                            repeatCount: repeatCounts[note.id] ?? 0,
+                                            isNew: note.id == latestNoteID,
+                                            onTap: {
+                                                appState.activeNote = note
+                                                withAnimation(AppAnimation.springFluid) { appState.stage = .detail }
+                                            },
+                                            onArchive: { archiveNote(note) },
+                                            onDelete: { deleteNote(note) }
+                                        )
+                                    }
+                                }
                                 .inkReveal(active: note.id == latestNoteID)
                                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                                 .animation(
@@ -584,22 +604,57 @@ struct MindView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
 
-            CaptureBarView(
-                text: Binding(get: { appState.captureText }, set: { appState.captureText = $0 }),
-                onSubmit: submit,
-                savingToLibrary: appState.isSavingToLibrary,
-                urlDetected: captureURLDetected,
-                voiceManager: voiceManager,
-                stressMode: appState.stressMode,
-                focusTrigger: appState.shouldFocusCapture,
-                onFocusHandled: { appState.shouldFocusCapture = false }
-            )
+            HStack(alignment: .bottom, spacing: 10) {
+                CaptureBarView(
+                    text: Binding(get: { appState.captureText }, set: { appState.captureText = $0 }),
+                    onSubmit: submit,
+                    savingToLibrary: appState.isSavingToLibrary,
+                    urlDetected: captureURLDetected,
+                    voiceManager: voiceManager,
+                    stressMode: appState.stressMode,
+                    focusTrigger: appState.shouldFocusCapture,
+                    onFocusHandled: { appState.shouldFocusCapture = false }
+                )
+                Button {
+                    appState.isRecordingVoice = true
+                } label: {
+                    Image(systemName: "waveform")
+                        .appFont(16, .regular, relativeTo: .body)
+                        .foregroundStyle(AppColors.voiceAccent)
+                        .frame(width: 44, height: 44)
+                        .background(AppColors.voiceAccent.opacity(0.12))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(AppColors.voiceAccent.opacity(0.2), lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("nova gravação")
+            }
             .padding(.horizontal, 16)
             .padding(.bottom, 36)
         }
     }
 
     // MARK: - Submit logic
+
+    /// Inserts a finished voice recording as a `.voice` note. Body stays empty
+    /// until the user transcribes it from the detail sheet.
+    private func insertVoiceNote(fileName: String, duration: TimeInterval,
+                                 waveform: [Float], drill: RoteiroDrill?) {
+        let note = Note(rawText: "", type: .voice)
+        note.audioFileName = fileName
+        note.audioDuration = duration
+        note.waveform = waveform
+        note.drill = drill?.rawValue
+        withAnimation(AppAnimation.springFluid) {
+            latestNoteID = note.id
+            modelContext.insert(note)
+            HapticEngine.noteArrived()
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            latestNoteID = nil
+        }
+    }
 
     private func submit() {
         let text = appState.captureText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -721,6 +776,10 @@ struct MindView: View {
             if appState.activeNote?.id == note.id {
                 appState.stage = .inbox
                 appState.activeNote = nil
+            }
+            if note.isVoice, let file = note.audioFileName {
+                if audioPlayer.playingFileName == file { audioPlayer.stop() }
+                RecordingsDirectory.remove(file)
             }
             modelContext.delete(note)
         }
