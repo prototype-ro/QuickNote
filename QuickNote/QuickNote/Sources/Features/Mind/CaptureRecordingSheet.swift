@@ -114,12 +114,14 @@ struct CaptureRecordingSheet: View {
     }
 }
 
-// MARK: - PlayerPanel (detail playback with real-waveform scrubber)
+// MARK: - PlayerPanel (detail playback with real-waveform scrubber + color stamp ticks)
 struct PlayerPanel: View {
     let fileName: String
     let peaks: [Float]
     let duration: TimeInterval
+    let marks: [VoiceMark]
     let player: AudioPlayerService
+    var onScrub: ((Double) -> Void)? = nil
 
     private var isThis: Bool { player.playingFileName == fileName }
     private var isPlaying: Bool { player.isPlaying && isThis }
@@ -139,11 +141,25 @@ struct PlayerPanel: View {
 
             VStack(spacing: 6) {
                 GeometryReader { geo in
-                    StaticWaveform(peaks: peaks, progress: progress)
-                        .contentShape(Rectangle())
-                        .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                            if isThis { player.seek(toFraction: min(1, max(0, v.location.x / geo.size.width))) }
-                        })
+                    ZStack(alignment: .leading) {
+                        StaticWaveform(peaks: peaks, progress: progress)
+                        ForEach(marks) { m in
+                            let x = duration > 0 ? CGFloat(m.time / duration) * geo.size.width : 0
+                            Rectangle()
+                                .fill(StampPalette.color(for: m.colorIndex))
+                                .frame(width: 2)
+                                .offset(x: x)
+                        }
+                    }
+                    .frame(height: 26)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { v in
+                                let f = min(1, max(0, v.location.x / geo.size.width))
+                                if isThis { player.seek(toFraction: f) } else { onScrub?(f) }
+                            }
+                    )
                 }
                 .frame(height: 26)
                 HStack {

@@ -133,8 +133,26 @@ struct NoteDetailSheet: View {
     private var voiceHero: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let file = note.audioFileName {
-                PlayerPanel(fileName: file, peaks: note.waveform,
-                            duration: note.audioDuration, player: audioPlayer)
+                PlayerPanel(fileName: file, peaks: note.waveform, duration: note.audioDuration,
+                            marks: note.voiceMarks, player: audioPlayer,
+                            onScrub: { f in audioPlayer.play(fileName: file); audioPlayer.seek(toFraction: f) })
+
+                HStack {
+                    Button {
+                        let t = audioPlayer.playingFileName == file ? audioPlayer.currentTime : 0
+                        note.voiceMarks.append(VoiceMark(time: min(max(t, 0), note.audioDuration)))
+                        HapticEngine.classify()
+                    } label: {
+                        Label("marca", systemImage: "mappin.circle")
+                            .appFont(14, .medium).foregroundStyle(AppColors.voiceAccent)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+
+                if !note.voiceMarks.isEmpty {
+                    VoiceStampsSection(note: note, player: audioPlayer)
+                }
             }
 
             Menu {
