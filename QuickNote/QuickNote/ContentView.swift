@@ -4,17 +4,20 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var appState = AppState()
+    @State private var audioPlayer = AudioPlayerService()
 
     var body: some View {
         ZStack {
             // Mind is always the base layer
             MindView()
                 .environment(appState)
+                .environment(audioPlayer)
 
             // Library slides in from the trailing edge
             if appState.stage == .library {
                 LibraryView()
                     .environment(appState)
+                    .environment(audioPlayer)
                     .transition(.move(edge: .trailing))
                     .zIndex(1)
             }
@@ -23,6 +26,7 @@ struct ContentView: View {
             if appState.stage == .splash {
                 SplashView()
                     .environment(appState)
+                    .environment(audioPlayer)
                     .transition(.opacity)
                     .zIndex(2)
             }
