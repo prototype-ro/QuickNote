@@ -63,12 +63,15 @@ public final class AudioRecorderService: NSObject {
             levelBuffer = []
             state = .recording
             startMetering()
+            NotificationCenter.default.addObserver(self, selector: #selector(handleInterruption(_:)),
+                name: AVAudioSession.interruptionNotification, object: nil)
         } catch { state = .idle }
     }
 
     /// Stops and returns the saved file name, duration, and downsampled waveform.
     @discardableResult
     public func stop(bars: Int = 48) -> (fileName: String, duration: TimeInterval, waveform: [Float])? {
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
         guard let rec = recorder, let name = currentFileName else { return nil }
         let duration = rec.currentTime
         rec.stop()
@@ -80,11 +83,22 @@ public final class AudioRecorderService: NSObject {
     }
 
     public func cancel() {
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
         guard let rec = recorder, let name = currentFileName else { return }
         rec.stop(); rec.deleteRecording()
         RecordingsDirectory.remove(name)
         stopMetering()
         recorder = nil; currentFileName = nil; state = .idle
+    }
+
+    @objc private func handleInterruption(_ note: Notification) {
+        guard let info = note.userInfo,
+              let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+        if type == .began {
+            // Save what we have rather than risk losing audio.
+            Task { @MainActor in RecordingCoordinator.shared.stop() }
+        }
     }
 
     private func startMetering() {

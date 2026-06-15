@@ -161,6 +161,9 @@ struct MindView: View {
             detectStressMode(allNotes)
             backfillEmbeddings(allNotes)
             WidgetBridge.update(from: allNotes)
+            RecordingCoordinator.shared.onFinish = { fileName, duration, waveform, drill in
+                insertVoiceNote(fileName: fileName, duration: duration, waveform: waveform, drill: drill)
+            }
         }
         .onChange(of: allNotes.count) { old, new in
             computePatterns(allNotes)
@@ -181,11 +184,9 @@ struct MindView: View {
             get: { appState.isRecordingVoice },
             set: { appState.isRecordingVoice = $0 }
         )) {
-            CaptureRecordingSheet { fileName, duration, waveform, drill in
-                insertVoiceNote(fileName: fileName, duration: duration, waveform: waveform, drill: drill)
-            }
-            .presentationDetents([.height(380)])
-            .presentationDragIndicator(.visible)
+            CaptureRecordingSheet()
+                .presentationDetents([.height(380)])
+                .presentationDragIndicator(.visible)
         }
     }
 
