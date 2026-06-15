@@ -68,6 +68,8 @@ public final class Note {
     public var voiceReview: VoiceReview? = nil
     /// Freeform "anotações sobre a gravação" (kept separate from AI `summary`).
     public var voiceAnnotation: String = ""
+    /// Colored timestamps dropped while reviewing the recording. Migration-safe default.
+    public var voiceMarks: [VoiceMark] = []
 
     public init(
         id: UUID = UUID(),
