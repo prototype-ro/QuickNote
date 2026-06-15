@@ -116,11 +116,6 @@
 			path = QuickNoteShareExtension;
 			sourceTree = "<group>";
 		};
-		71EA7A852FE00F6200E69A2B /* QuickNoteLiveActivityIntent */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = QuickNoteLiveActivityIntent;
-			sourceTree = "<group>";
-		};
 		71EA7A9F2FE0107A00E69A2B /* QuickNoteLiveActivity */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -164,7 +159,6 @@
 				71EA7AB42FE010A900E69A2B /* QuickNoteLiveActivityExtension.entitlements */,
 				713614082F9CED9200EAF072 /* QuickNote */,
 				71B143202FA4C638002EF4E0 /* QuickNoteShareExtension */,
-				71EA7A852FE00F6200E69A2B /* QuickNoteLiveActivityIntent */,
 				71EA7A9F2FE0107A00E69A2B /* QuickNoteLiveActivity */,
 				71EA7A9A2FE0107A00E69A2B /* Frameworks */,
 				713614072F9CED9200EAF072 /* Products */,
