@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 public enum NoteType: String, Codable, CaseIterable {
-    case task, idea, note, link, digest
+    case task, idea, note, link, digest, voice
 
     public var iconName: String {
         switch self {
@@ -11,6 +11,7 @@ public enum NoteType: String, Codable, CaseIterable {
         case .note:   return "note.text"
         case .link:   return "link"
         case .digest: return "calendar"
+        case .voice:  return "waveform"
         }
     }
 

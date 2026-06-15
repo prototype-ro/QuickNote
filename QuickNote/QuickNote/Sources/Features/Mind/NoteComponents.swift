@@ -119,6 +119,7 @@ struct CatIcon: View {
         case .note:   return "doc"
         case .link:   return "link"
         case .digest: return "calendar"
+        case .voice:  return "waveform"
         }
     }
 }

@@ -92,6 +92,7 @@ public enum AppColors {
         case .note:   return ink.opacity(0.05)
         case .link:   return ink.opacity(0.07)
         case .digest: return ink.opacity(0.04)
+        case .voice:  return ink.opacity(0.05)
         }
     }
 }
