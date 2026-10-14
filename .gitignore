@@ -11,3 +11,7 @@ DerivedData/
 # macOS
 .DS_Store
 .superpowers/
+
+# Local build config with API keys
+**/Config.xconfig
+Config.xconfig
